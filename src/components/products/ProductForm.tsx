@@ -8,12 +8,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  AlertCircle,
+  Barcode,
+  DollarSign,
+  FileText,
+  PlusCircle,
+  Save,
+  Tag,
+  Warehouse,
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
-import { updateProduct, createProduct } from "@/app/actions/products"; // Import trực tiếp
+import { updateProduct, createProduct } from "@/app/actions/products";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface ProductFormProps {
   initialData?: Product;
@@ -44,6 +54,7 @@ export function ProductForm({
         : {
             unit: "Viên",
             sale_price: 0,
+            min_stock: 0,
             is_active: true,
             can_sell: true,
           },
@@ -51,11 +62,39 @@ export function ProductForm({
 
   const isActive = watch("is_active");
   const canSell = watch("can_sell");
+  const unit = watch("unit");
+
+  const validateForm = (data: ProductFormData): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!data.internal_code?.trim()) {
+      newErrors.internal_code = "Mã sản phẩm là bắt buộc";
+    }
+
+    if (!data.name?.trim()) {
+      newErrors.name = "Tên sản phẩm là bắt buộc";
+    }
+
+    if (data.sale_price < 0) {
+      newErrors.sale_price = "Giá bán không được âm";
+    }
+
+    if (data.min_stock < 0) {
+      newErrors.min_stock = "Tồn tối thiểu không được âm";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleFormSubmit = async (data: ProductFormData) => {
+    if (!validateForm(data)) {
+      toast.error("Vui lòng kiểm tra lại thông tin");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Làm sạch dữ liệu trước khi gửi
       const cleanData = {
         ...data,
         barcode: data.barcode?.trim() || null,
@@ -67,10 +106,10 @@ export function ProductForm({
 
       if (initialData) {
         await updateProduct(initialData.id, cleanData);
-        toast.success("Cập nhật thành công");
+        toast.success("Cập nhật sản phẩm thành công!");
       } else {
         await createProduct(cleanData);
-        toast.success("Thêm mới thành công");
+        toast.success("Thêm sản phẩm mới thành công!");
       }
 
       router.push("/products");
@@ -82,186 +121,336 @@ export function ProductForm({
     }
   };
 
+  const generateProductCode = () => {
+    const prefix = "SP";
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0");
+    const newCode = `${prefix}${timestamp}${random}`;
+    setValue("internal_code", newCode);
+  };
+
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-      {/* Phần Alert trạng thái (giữ nguyên logic của bạn) */}
+      {/* Status Indicator (chỉ hiển thị khi edit) */}
       {initialData && (
-        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              {isActive ? (
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-amber-500" />
-              )}
-              <span className="font-medium">
-                {isActive ? "Đang kinh doanh" : "Ngừng kinh doanh"}
+        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Chỉnh sửa sản phẩm</h2>
+            <p className="text-sm text-muted-foreground">
+              Cập nhật thông tin sản phẩm trong kho
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-background border">
+              <div
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  isActive ? "bg-green-500" : "bg-red-500"
+                )}
+              />
+              <span className="text-sm">
+                {isActive ? "Đang hoạt động" : "Ngừng hoạt động"}
               </span>
             </div>
             {!canSell && (
-              <div className="flex items-center gap-2 text-red-500">
-                <AlertCircle className="h-5 w-5" />
-                <span className="font-medium">Không được bán</span>
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-background border">
+                <AlertCircle className="h-3 w-3" />
+                <span className="text-sm">Không bán</span>
               </div>
             )}
-          </div>
-
-          {/* Hiển thị mã nội bộ thay vì tồn kho nếu cột stock chưa có */}
-          <div className="text-sm text-muted-foreground italic">
-            Mã định danh:{" "}
-            <span className="font-mono">{initialData.internal_code}</span>
           </div>
         </div>
       )}
 
+      {/* Error Alert */}
+      {Object.keys(errors).length > 0 && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Vui lòng kiểm tra lại các trường thông tin bắt buộc
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CỘT 1: THÔNG TIN CƠ BẢN */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin cơ bản</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Mã sản phẩm *</Label>
-              <Input {...register("internal_code")} disabled={!!initialData} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tên sản phẩm *</Label>
-              <Input {...register("name")} placeholder="Tên thuốc..." />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Danh mục</Label>
-                <select
-                  {...register("category")}
-                  className="w-full p-2 border rounded-md bg-background text-sm"
+        {/* Basic Information */}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="internal_code" className="text-sm font-medium">
+              Mã sản phẩm <span className="text-red-500">*</span>
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="internal_code"
+                {...register("internal_code")}
+                disabled={!!initialData}
+                className={cn(
+                  "h-11",
+                  errors.internal_code &&
+                    "border-red-500 focus-visible:ring-red-500"
+                )}
+                placeholder="VD: SP001, THUOC001"
+              />
+              {!initialData && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generateProductCode}
+                  className="h-11 whitespace-nowrap"
                 >
-                  <option value="">Chọn danh mục</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Barcode</Label>
-                <Input {...register("barcode")} />
-              </div>
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Tạo mã
+                </Button>
+              )}
+            </div>
+            {errors.internal_code && (
+              <p className="text-sm text-red-500">{errors.internal_code}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm font-medium">
+              Tên sản phẩm <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="name"
+              {...register("name")}
+              className={cn(
+                "h-11",
+                errors.name && "border-red-500 focus-visible:ring-red-500"
+              )}
+              placeholder="Nhập tên đầy đủ của sản phẩm"
+            />
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="category" className="text-sm font-medium">
+                Danh mục
+              </Label>
+              <select
+                id="category"
+                {...register("category")}
+                className="w-full h-11 px-3 py-2 border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">Chọn danh mục</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
-              <Label>Đơn vị tính</Label>
-              <div className="flex flex-wrap gap-2">
-                {UNITS.map((u) => (
-                  <Button
-                    key={u}
-                    type="button"
-                    variant={watch("unit") === u ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setValue("unit", u)}
-                  >
-                    {u}
-                  </Button>
-                ))}
-              </div>
+              <Label htmlFor="barcode" className="text-sm font-medium">
+                Mã vạch (Barcode)
+              </Label>
+              <Input
+                id="barcode"
+                {...register("barcode")}
+                className="h-11"
+                placeholder="Nhập mã vạch"
+              />
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* CỘT 2: GIÁ & KHO */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Giá cả & Tồn kho</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Đơn vị tính</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {UNITS.map((u) => (
+                <Button
+                  key={u}
+                  type="button"
+                  variant={unit === u ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setValue("unit", u)}
+                  className="h-10"
+                >
+                  {u}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Price & Stock */}
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Giá cả</Label>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Giá bán *</Label>
-                <Input
-                  type="number"
-                  {...register("sale_price", { valueAsNumber: true })}
-                />
+                <Label htmlFor="sale_price" className="text-xs">
+                  Giá bán <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    ₫
+                  </span>
+                  <Input
+                    id="sale_price"
+                    type="number"
+                    {...register("sale_price", { valueAsNumber: true })}
+                    className={cn(
+                      "h-11 pl-8",
+                      errors.sale_price &&
+                        "border-red-500 focus-visible:ring-red-500"
+                    )}
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
+                {errors.sale_price && (
+                  <p className="text-sm text-red-500">{errors.sale_price}</p>
+                )}
               </div>
+
               <div className="space-y-2">
-                <Label>Giá nhập</Label>
-                <Input
-                  type="number"
-                  {...register("cost_price", { valueAsNumber: true })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Tồn kho hiện tại</Label>
-                <Input
-                  value={watch("current_stock") || 0}
-                  disabled
-                  className="bg-muted font-bold text-blue-600"
-                />
-                <p className="text-[10px] text-muted-foreground italic">
-                  * Số lượng tồn được cập nhật tự động qua phiếu nhập/xuất
-                </p>
+                <Label htmlFor="cost_price" className="text-xs">
+                  Giá nhập
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    ₫
+                  </span>
+                  <Input
+                    id="cost_price"
+                    type="number"
+                    {...register("cost_price", { valueAsNumber: true })}
+                    className="h-11 pl-8"
+                    placeholder="0"
+                    min="0"
+                  />
+                </div>
               </div>
             </div>
+          </div>
 
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Quản lý tồn kho</Label>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Tồn tối thiểu</Label>
+                <Label htmlFor="min_stock" className="text-xs">
+                  Tồn tối thiểu <span className="text-red-500">*</span>
+                </Label>
                 <Input
+                  id="min_stock"
                   type="number"
                   {...register("min_stock", { valueAsNumber: true })}
+                  className={cn(
+                    "h-11",
+                    errors.min_stock &&
+                      "border-red-500 focus-visible:ring-red-500"
+                  )}
+                  placeholder="0"
+                  min="0"
                 />
+                {errors.min_stock && (
+                  <p className="text-sm text-red-500">{errors.min_stock}</p>
+                )}
               </div>
+
               <div className="space-y-2">
-                <Label>Tồn tối đa</Label>
+                <Label htmlFor="max_stock" className="text-xs">
+                  Tồn tối đa
+                </Label>
                 <Input
+                  id="max_stock"
                   type="number"
                   {...register("max_stock", { valueAsNumber: true })}
+                  className="h-11"
+                  placeholder="Không giới hạn"
+                  min="0"
                 />
               </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">
+                  Trạng thái hoạt động
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Sản phẩm có đang được sử dụng
+                </p>
+              </div>
+              <Switch
+                checked={isActive}
+                onCheckedChange={(checked) => setValue("is_active", checked)}
+              />
             </div>
 
-            <div className="pt-4 space-y-4 border-t">
-              <div className="flex items-center justify-between">
-                <Label>Hoạt động</Label>
-                <Switch
-                  checked={isActive}
-                  onCheckedChange={(v) => setValue("is_active", v)}
-                />
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Có thể bán</Label>
+                <p className="text-xs text-muted-foreground">
+                  Hiển thị tại quầy bán hàng
+                </p>
               </div>
-              <div className="flex items-center justify-between">
-                <Label>Cho phép bán</Label>
-                <Switch
-                  checked={canSell}
-                  onCheckedChange={(v) => setValue("can_sell", v)}
-                />
-              </div>
+              <Switch
+                checked={canSell}
+                onCheckedChange={(checked) => setValue("can_sell", checked)}
+              />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ghi chú</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea {...register("notes")} rows={3} />
-        </CardContent>
-      </Card>
+      {/* Notes */}
+      <div className="space-y-2">
+        <Label htmlFor="notes" className="text-sm font-medium">
+          Ghi chú
+        </Label>
+        <Textarea
+          id="notes"
+          {...register("notes")}
+          placeholder="Ghi chú thêm về sản phẩm..."
+          className="min-h-[100px]"
+        />
+      </div>
 
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
-          Hủy
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? "Đang xử lý..."
-            : initialData
-            ? "Cập nhật sản phẩm"
-            : "Thêm mới sản phẩm"}
-        </Button>
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 border-t">
+        <div className="text-sm text-muted-foreground">
+          Các trường có dấu <span className="text-red-500">*</span> là bắt buộc
+        </div>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+            disabled={isSubmitting}
+            className="flex-1 sm:w-28"
+          >
+            Hủy
+          </Button>
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 sm:w-48 gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Đang xử lý...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {initialData ? "Cập nhật" : "Tạo sản phẩm"}
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   );

@@ -1,22 +1,22 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import { Toaster } from '@/components/ui/sonner'
-import Sidebar from '@/components/layout/sidebar'
-import Header from '@/components/layout/header'
-import { ThemeProvider } from '@/providers/theme-provider'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import Sidebar from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
+import { ThemeProvider } from "@/providers/theme-provider";
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'MedPOS - Hệ thống POS Nhà thuốc',
-  description: 'Hệ thống quản lý bán hàng cho nhà thuốc Tây',
-}
+  title: "MedPOS - Hệ thống POS Nhà thuốc",
+  description: "Hệ thống quản lý bán hàng cho nhà thuốc Tây",
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
@@ -26,7 +26,8 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
-        >        <div className="flex min-h-screen bg-background">
+        >
+          <div className="flex min-h-screen bg-background">
             <Sidebar />
             <div className="flex-1 flex flex-col">
               <Header />
@@ -34,9 +35,10 @@ export default function RootLayout({
                 {children}
               </main>
             </div>
-          </div></ThemeProvider>
+          </div>
+        </ThemeProvider>
         <Toaster />
       </body>
     </html>
-  )
+  );
 }
