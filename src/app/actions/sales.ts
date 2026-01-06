@@ -1,146 +1,58 @@
-// app/actions/sales.ts
 "use server";
-
 import { supabaseAdmin } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
-import { v4 as uuidv4 } from "uuid";
 
-interface SaleItemInput {
-  product_id: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-}
-
-interface CreateSaleInput {
-  customer_name?: string | null;
-  customer_phone?: string | null;
-  total_amount: number;
-  discount: number;
-  final_amount: number;
-  payment_method?: string | null;
-  notes?: string | null;
-  items: SaleItemInput[];
-}
-
-export async function createSale(saleData: CreateSaleInput) {
+export async function createSaleAction(data: any) {
   try {
-    const saleId = uuidv4();
-    const saleCode = `HD-${Date.now().toString().slice(-6)}`;
-
-    // Tạo sale record
-    const { error: saleError } = await supabaseAdmin.from("sales").insert([
-      {
-        id: saleId,
-        sale_code: saleCode,
-        sale_date: new Date().toISOString(),
-        ...saleData,
-      },
-    ]);
+    // 1. Tạo hóa đơn (sales)
+    const { data: sale, error: saleError } = await supabaseAdmin
+      .from("sales")
+      .insert([
+        {
+          sale_code: `HD${Date.now().toString().slice(-8)}`,
+          sale_date: new Date().toISOString().split("T")[0],
+          customer_name: data.customerName,
+          customer_phone: data.customerPhone,
+          total_amount: data.totalAmount,
+          discount: data.discount,
+          final_amount: data.finalAmount,
+          payment_method: data.paymentMethod,
+          notes: data.notes,
+        },
+      ])
+      .select()
+      .single();
 
     if (saleError) throw saleError;
 
-    // Tạo sale items
-    const saleItems = saleData.items.map((item) => ({
-      id: uuidv4(),
-      sale_id: saleId,
-      ...item,
+    // 2. Lưu chi tiết (sale_items) và trừ kho
+    const itemsToInsert = data.items.map((item: any) => ({
+      sale_id: sale.id,
+      product_id: item.id,
+      quantity: item.quantity,
+      unit_price: item.sale_price,
+      total_price: item.quantity * item.sale_price,
     }));
 
     const { error: itemsError } = await supabaseAdmin
       .from("sale_items")
-      .insert(saleItems);
-
+      .insert(itemsToInsert);
     if (itemsError) throw itemsError;
 
-    // Cập nhật inventory cho từng sản phẩm
-    for (const item of saleData.items) {
-      // 1. Tạo inventory transaction
-      await supabaseAdmin.from("inventory_transactions").insert([
-        {
-          product_id: item.product_id,
-          transaction_type: "sale",
-          quantity_change: -item.quantity,
-          reference_id: saleId,
-          notes: `Bán hàng - ${saleCode}`,
-        },
-      ]);
-
-      // 2. Cập nhật inventory snapshot thông qua RPC
-      const { error: updateError } = await supabaseAdmin.rpc(
-        "update_inventory_on_sale",
-        {
-          p_product_id: item.product_id,
-          p_quantity_change: -item.quantity,
-          p_reference_id: saleId,
-        }
-      );
-
-      if (updateError) throw updateError;
+    // 3. Cập nhật tồn kho qua RPC
+    for (const item of data.items) {
+      await supabaseAdmin.rpc("update_inventory_quantity", {
+        p_product_id: item.id,
+        p_quantity_change: -item.quantity, // Dấu trừ để trừ kho
+        p_transaction_type: "sale",
+        p_reference_id: sale.id,
+        p_notes: `Bán hàng hóa đơn: ${sale.sale_code}`,
+      });
     }
 
-    revalidatePath("/pos");
-    revalidatePath("/sales");
-
-    return {
-      success: true,
-      data: {
-        sale_id: saleId,
-        sale_code: saleCode,
-      },
-    };
-  } catch (error) {
-    console.error("Error creating sale:", error);
-    return { success: false, error: "Failed to create sale" };
-  }
-}
-
-export async function getSales(dateFrom?: string, dateTo?: string) {
-  try {
-    let query = supabaseAdmin
-      .from("sales")
-      .select(
-        `
-        *,
-        sale_items (*)
-      `
-      )
-      .order("created_at", { ascending: false });
-
-    if (dateFrom && dateTo) {
-      query = query.gte("sale_date", dateFrom).lte("sale_date", dateTo);
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error fetching sales:", error);
-    return { success: false, error: "Failed to fetch sales" };
-  }
-}
-
-export async function getSaleById(id: string) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("sales")
-      .select(
-        `
-        *,
-        sale_items (
-          *,
-          products (*)
-        )
-      `
-      )
-      .eq("id", id)
-      .single();
-
-    if (error) throw error;
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error fetching sale:", error);
-    return { success: false, error: "Failed to fetch sale" };
+    revalidatePath("/products");
+    return { success: true, saleCode: sale.sale_code };
+  } catch (error: any) {
+    return { success: false, message: error.message };
   }
 }
