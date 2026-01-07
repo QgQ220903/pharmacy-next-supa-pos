@@ -1,43 +1,54 @@
 import { supabaseAdmin } from "@/lib/supabase-server";
-import EntryListClient from "@/app/entries/EntryListClient";
+import EntryListClient from "@/components/entries/EntryListClient";
 import { Button } from "@/components/ui/button";
-import { Plus, Truck } from "lucide-react";
 import Link from "next/link";
+import { Plus, Download } from "lucide-react";
 
 export default async function EntriesPage() {
-  // Lấy danh sách phiếu nhập + kèm chi tiết món hàng + tên sản phẩm (Join bảng)
-  const { data: entries } = await supabaseAdmin
+  // Lấy danh sách phiếu nhập kèm theo chi tiết sản phẩm
+  const { data: entries, error } = await supabaseAdmin
     .from("stock_entries")
     .select(
       `
       *,
       items:stock_entry_items(
-        *,
-        products(name)
+        id,
+        quantity,
+        unit_price,
+        total_price,
+        batch_number,
+        expiry_date,
+        products(name, unit)
       )
     `
     )
     .order("created_at", { ascending: false });
 
+  if (error) return <div>Lỗi tải dữ liệu: {error.message}</div>;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Truck className="h-6 w-6 text-primary" /> Lịch sử nhập kho
+          <h1 className="text-2xl font-bold tracking-tight">
+            Lịch sử nhập hàng
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Quản lý và theo dõi các đợt nhập hàng
+          <p className="text-muted-foreground text-sm">
+            Quản lý các hóa đơn nhập kho và lô hàng.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/entries/new">
-            <Plus className="h-4 w-4 mr-2" /> Nhập hàng mới
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <Download className="mr-2 h-4 w-4" /> Xuất Excel
+          </Button>
+          <Button asChild className="bg-blue-600 hover:bg-blue-700">
+            <Link href="/entries/new">
+              <Plus className="mr-2 h-4 w-4" /> Nhập hàng mới
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Truyền dữ liệu vào Component xử lý phía Client */}
       <EntryListClient initialEntries={entries || []} />
     </div>
   );

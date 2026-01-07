@@ -17,6 +17,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   current_stock: number;
+  manage_by_batch: boolean; // THÊM TRƯỜNG NÀY
 }
 
 // @/types/index.ts
@@ -63,6 +64,38 @@ export interface StockEntry {
   status: string;
   created_at: string;
   created_by?: string | null;
+}
+
+export interface ProductBatch {
+  id: string;
+  product_id: string;
+  batch_number: string;
+  expiry_date: string;
+  quantity: number;
+  created_at: string;
+  updated_at: string; // THÊM MỚI
+}
+
+export interface StockEntryItem {
+  id: string;
+  stock_entry_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at?: string; // Khớp với SQL
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  manufacturer?: string | null; // THÊM MỚI
+  registration_number?: string | null; // THÊM MỚI
+  products?: {
+    name: string;
+    unit: string;
+  };
+}
+
+export interface StockEntryWithItems extends StockEntry {
+  items: StockEntryItem[];
 }
 
 export interface Sale {

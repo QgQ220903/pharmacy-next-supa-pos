@@ -7,6 +7,8 @@ import {
   CreditCard,
   Banknote,
   AlertCircle,
+  Layers,
+  Package,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,9 +21,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ProductSearch } from "@/components/products/ProductSearch";
 import { formatPrice, cn } from "@/lib/utils";
-import { createSaleAction } from "@/app/actions/sales";
+import { createSaleAction, getProductBatchesAction } from "@/app/actions/sales";
 import { toast } from "sonner";
 
 export default function POSForm({ products }: { products: any[] }) {
@@ -31,7 +40,7 @@ export default function POSForm({ products }: { products: any[] }) {
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [loading, setLoading] = useState(false);
 
-  // 1. Thêm phím tắt F12 để thanh toán
+  // 1. Phím tắt F12 thanh toán
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F12") {
@@ -43,48 +52,87 @@ export default function POSForm({ products }: { products: any[] }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cart, customer, discount, paymentMethod]);
 
-  // 2. Logic cập nhật số lượng có kiểm tra tồn kho
-  const updateQuantity = (id: string, qty: number) => {
-    const item = cart.find((i) => i.id === id);
-    if (!item) return;
-
-    let newQty = qty;
-
-    // Chặn nếu bán quá số lượng tồn
-    if (newQty > item.current_stock) {
-      toast.warning(
-        `Sản phẩm ${item.name} chỉ còn ${item.current_stock} trong kho`,
-        {
-          icon: <AlertCircle className="h-4 w-4 text-orange-500" />,
-        }
-      );
-      newQty = item.current_stock;
-    }
-
-    if (newQty < 1) newQty = 1;
-
+  // 2. Logic cập nhật số lượng (Kiểm tra tồn theo Lô hoặc theo Tổng)
+  const updateQuantity = (cartItemId: string, qty: number) => {
     setCart((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i))
+      prev.map((item) => {
+        if (item.cartId !== cartItemId) return item;
+
+        let newQty = qty;
+        // Kiểm tra tồn kho khả dụng
+        const maxAvailable = item.manage_by_batch
+          ? item.selected_batch_qty
+          : item.current_stock;
+
+        if (newQty > maxAvailable) {
+          toast.warning(`Chỉ còn ${maxAvailable} sản phẩm khả dụng`);
+          newQty = maxAvailable;
+        }
+        if (newQty < 1) newQty = 1;
+
+        return { ...item, quantity: newQty };
+      })
     );
   };
 
-  // 3. Thêm thuốc vào giỏ
-  const addToCart = (product: any) => {
+  // 3. Thêm sản phẩm vào giỏ hàng (Xử lý Batch)
+  const addToCart = async (product: any) => {
     if (product.current_stock <= 0) {
       return toast.error("Sản phẩm đã hết hàng!");
     }
 
-    const existing = cart.find((item) => item.id === product.id);
-    if (existing) {
-      updateQuantity(product.id, existing.quantity + 1);
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
-      toast.success(`Đã thêm ${product.name}`);
+    setLoading(true);
+    try {
+      if (product.manage_by_batch) {
+        // Lấy danh sách lô còn hạn và còn hàng
+        const res = await getProductBatchesAction(product.id);
+        if (!res.success || res.data.length === 0) {
+          toast.error(
+            "Sản phẩm theo lô nhưng không tìm thấy lô hàng khả dụng!"
+          );
+          return;
+        }
+
+        const batches = res.data;
+        const firstBatch = batches[0]; // Lô ưu tiên (HSD gần nhất)
+
+        // CartId kết hợp Product + Batch để phân biệt nếu cùng 1 thuốc nhưng chọn 2 lô khác nhau
+        const cartId = `${product.id}-${firstBatch.id}`;
+        const existing = cart.find((i) => i.cartId === cartId);
+
+        if (existing) {
+          updateQuantity(cartId, existing.quantity + 1);
+        } else {
+          setCart([
+            ...cart,
+            {
+              ...product,
+              cartId,
+              quantity: 1,
+              selected_batch_id: firstBatch.id,
+              selected_batch_number: firstBatch.batch_number,
+              selected_batch_qty: firstBatch.quantity,
+              available_batches: batches,
+            },
+          ]);
+        }
+      } else {
+        // Hàng thường không theo lô
+        const cartId = product.id;
+        const existing = cart.find((i) => i.cartId === cartId);
+        if (existing) {
+          updateQuantity(cartId, existing.quantity + 1);
+        } else {
+          setCart([...cart, { ...product, cartId, quantity: 1 }]);
+        }
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const removeFromCart = (id: string) =>
-    setCart((prev) => prev.filter((item) => item.id !== id));
+  const removeFromCart = (cartId: string) =>
+    setCart((prev) => prev.filter((item) => item.cartId !== cartId));
 
   // 4. Tính toán tiền
   const totalAmount = useMemo(
@@ -96,6 +144,7 @@ export default function POSForm({ products }: { products: any[] }) {
   // 5. Xử lý thanh toán
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("Giỏ hàng đang trống");
+    if (loading) return;
 
     setLoading(true);
     const res = await createSaleAction({
@@ -114,7 +163,7 @@ export default function POSForm({ products }: { products: any[] }) {
       setCustomer({ name: "", phone: "" });
       setDiscount(0);
     } else {
-      toast.error(res.message || "Lỗi khi xử lý thanh toán");
+      toast.error(res.message);
     }
     setLoading(false);
   };
@@ -127,23 +176,33 @@ export default function POSForm({ products }: { products: any[] }) {
           <ProductSearch products={products} onSelect={addToCart} />
         </Card>
 
-        <Card className="flex-1 overflow-hidden flex flex-col shadow-sm">
-          <CardHeader className="py-3 border-b bg-muted/30">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4 text-primary" />
-              DANH SÁCH THUỐC ĐANG CHỌN ({cart.length})
+        <Card className="flex-1 overflow-hidden flex flex-col shadow-sm border-slate-200">
+          <CardHeader className="py-3 border-b bg-slate-50/50">
+            <CardTitle className="text-xs font-bold flex items-center gap-2 uppercase tracking-wider">
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              Giỏ hàng ({cart.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-auto">
             <Table>
-              <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                <TableRow>
-                  <TableHead>Tên thuốc</TableHead>
-                  <TableHead className="w-24 text-center">Đơn vị</TableHead>
-                  <TableHead className="w-32 text-center">Số lượng</TableHead>
-                  <TableHead className="text-right">Đơn giá</TableHead>
-                  <TableHead className="text-right">Thành tiền</TableHead>
-                  <TableHead className="w-12 text-center"></TableHead>
+              <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+                <TableRow className="bg-slate-50/30">
+                  <TableHead className="text-xs uppercase font-bold">
+                    Sản phẩm / Thông tin lô
+                  </TableHead>
+                  <TableHead className="w-24 text-center text-xs uppercase font-bold">
+                    ĐVT
+                  </TableHead>
+                  <TableHead className="w-32 text-center text-xs uppercase font-bold">
+                    Số lượng
+                  </TableHead>
+                  <TableHead className="text-right text-xs uppercase font-bold">
+                    Đơn giá
+                  </TableHead>
+                  <TableHead className="text-right text-xs uppercase font-bold">
+                    Thành tiền
+                  </TableHead>
+                  <TableHead className="w-10 text-center"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -151,57 +210,110 @@ export default function POSForm({ products }: { products: any[] }) {
                   <TableRow>
                     <TableCell
                       colSpan={6}
-                      className="h-40 text-center text-muted-foreground italic"
+                      className="h-40 text-center text-slate-400 italic"
                     >
-                      Chưa có sản phẩm nào trong giỏ hàng
+                      Chưa có thuốc nào trong giỏ hàng. Quét mã hoặc tìm kiếm để
+                      thêm.
                     </TableCell>
                   </TableRow>
                 ) : (
                   cart.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-muted/10">
-                      <TableCell>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-[10px] text-muted-foreground uppercase">
-                          {item.internal_code}
+                    <TableRow
+                      key={item.cartId}
+                      className="hover:bg-blue-50/30 transition-colors"
+                    >
+                      <TableCell className="py-3">
+                        <div className="space-y-1">
+                          <div className="font-bold text-slate-800">
+                            {item.name}
+                          </div>
+                          {item.manage_by_batch ? (
+                            <div className="flex items-center gap-2">
+                              <Layers size={12} className="text-blue-500" />
+                              <Select
+                                value={item.selected_batch_id}
+                                onValueChange={(val) => {
+                                  const b = item.available_batches.find(
+                                    (x: any) => x.id === val
+                                  );
+                                  setCart((prev) =>
+                                    prev.map((i) =>
+                                      i.cartId === item.cartId
+                                        ? {
+                                            ...i,
+                                            selected_batch_id: val,
+                                            selected_batch_number:
+                                              b.batch_number,
+                                            selected_batch_qty: b.quantity,
+                                          }
+                                        : i
+                                    )
+                                  );
+                                }}
+                              >
+                                <SelectTrigger className="h-7 text-[10px] w-[200px] border-blue-100 bg-blue-50/50">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {item.available_batches?.map((b: any) => (
+                                    <SelectItem
+                                      key={b.id}
+                                      value={b.id}
+                                      className="text-[11px]"
+                                    >
+                                      Lô: {b.batch_number} - HSD:{" "}
+                                      {new Date(
+                                        b.expiry_date
+                                      ).toLocaleDateString("vi-VN")}{" "}
+                                      (Còn {b.quantity})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                              <Package size={12} /> Hàng không quản lý lô
+                            </div>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-center text-muted-foreground italic text-sm">
+                      <TableCell className="text-center text-slate-500 font-medium text-sm">
                         {item.unit}
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
+                        <div className="flex flex-col items-center gap-1">
                           <Input
                             type="number"
                             value={item.quantity}
-                            className={cn(
-                              "h-8 text-center font-bold",
-                              item.quantity >= item.current_stock &&
-                                "border-orange-500 bg-orange-50"
-                            )}
+                            className="h-8 text-center font-black border-slate-300 focus:ring-blue-500 w-20"
                             onChange={(e) =>
-                              updateQuantity(item.id, Number(e.target.value))
+                              updateQuantity(
+                                item.cartId,
+                                Number(e.target.value)
+                              )
                             }
                           />
-                          <div className="text-[10px] text-center text-muted-foreground">
-                            Tồn:{" "}
-                            <span className="font-bold">
-                              {item.current_stock}
-                            </span>
-                          </div>
+                          <span className="text-[9px] text-slate-400">
+                            Tối đa:{" "}
+                            {item.manage_by_batch
+                              ? item.selected_batch_qty
+                              : item.current_stock}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="text-right font-medium text-slate-600">
                         {formatPrice(item.sale_price)}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-primary">
+                      <TableCell className="text-right font-black text-blue-700">
                         {formatPrice(item.sale_price * item.quantity)}
                       </TableCell>
                       <TableCell className="text-center">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => removeFromCart(item.id)}
+                          className="h-8 w-8 text-slate-300 hover:text-red-500"
+                          onClick={() => removeFromCart(item.cartId)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -216,16 +328,16 @@ export default function POSForm({ products }: { products: any[] }) {
       </div>
 
       {/* CỘT PHẢI: Thanh toán */}
-      <div className="lg:col-span-1 flex flex-col">
-        <Card className="shadow-lg border-2 border-primary/10 flex flex-col h-full bg-card">
-          <CardContent className="p-4 flex flex-col flex-1">
-            {/* Thông tin khách hàng */}
-            <div className="space-y-3 mb-6">
-              <h3 className="text-[11px] font-black text-muted-foreground uppercase flex items-center gap-2">
-                <User className="h-3 w-3" /> Thông tin khách hàng
+      <div className="lg:col-span-1 flex flex-col gap-4">
+        <Card className="shadow-lg border-t-4 border-t-blue-600 flex flex-col h-full">
+          <CardContent className="p-5 flex flex-col flex-1">
+            <div className="space-y-4 mb-6">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase flex items-center gap-2">
+                <User className="h-4 w-4" /> Khách hàng
               </h3>
               <Input
                 placeholder="Tên khách hàng"
+                className="bg-slate-50 focus:bg-white"
                 value={customer.name}
                 onChange={(e) =>
                   setCustomer({ ...customer, name: e.target.value })
@@ -233,6 +345,7 @@ export default function POSForm({ products }: { products: any[] }) {
               />
               <Input
                 placeholder="Số điện thoại"
+                className="bg-slate-50 focus:bg-white"
                 value={customer.phone}
                 onChange={(e) =>
                   setCustomer({ ...customer, phone: e.target.value })
@@ -240,41 +353,41 @@ export default function POSForm({ products }: { products: any[] }) {
               />
             </div>
 
-            {/* Chi tiết tiền */}
-            <div className="space-y-3 border-t pt-4 flex-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tạm tính:</span>
-                <span className="font-medium">{formatPrice(totalAmount)}</span>
+            <div className="space-y-3 border-t border-dashed pt-4 flex-1 text-sm font-medium text-slate-600">
+              <div className="flex justify-between">
+                <span>Tạm tính:</span>
+                <span>{formatPrice(totalAmount)}</span>
               </div>
-              <div className="flex justify-between text-sm items-center">
-                <span className="text-muted-foreground">Chiết khấu:</span>
-                <div className="flex items-center gap-1 border rounded px-2 bg-background">
+              <div className="flex justify-between items-center">
+                <span>Chiết khấu:</span>
+                <div className="flex items-center gap-1 border rounded bg-white px-2 py-1">
                   <span className="text-red-500 font-bold">-</span>
                   <input
                     type="number"
-                    className="w-20 h-8 text-right font-bold text-red-500 bg-transparent outline-none border-none"
+                    className="w-20 text-right font-bold text-red-500 outline-none"
                     value={discount}
                     onChange={(e) => setDiscount(Number(e.target.value))}
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-1 border-t pt-3 mt-4">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase">
-                  Tổng tiền thanh toán
+              <div className="pt-4 mt-4 border-t-2 border-slate-100">
+                <span className="text-[10px] font-black text-slate-400 uppercase">
+                  Tổng cộng thanh toán
                 </span>
-                <div className="text-3xl font-black text-primary text-right tracking-tighter">
+                <div className="text-3xl font-black text-blue-600 text-right tracking-tight">
                   {formatPrice(finalAmount)}
                 </div>
               </div>
             </div>
 
-            {/* Phương thức thanh toán */}
             <div className="grid grid-cols-2 gap-2 my-6">
               <Button
                 variant={paymentMethod === "Cash" ? "default" : "outline"}
                 className={cn(
-                  "flex flex-col h-16 gap-1 border-2",
-                  paymentMethod === "Cash" && "border-primary"
+                  "h-16 flex flex-col gap-1 border-2 transition-all",
+                  paymentMethod === "Cash"
+                    ? "bg-blue-600 border-blue-700"
+                    : "border-slate-100"
                 )}
                 onClick={() => setPaymentMethod("Cash")}
               >
@@ -286,8 +399,10 @@ export default function POSForm({ products }: { products: any[] }) {
               <Button
                 variant={paymentMethod === "Transfer" ? "default" : "outline"}
                 className={cn(
-                  "flex flex-col h-16 gap-1 border-2",
-                  paymentMethod === "Transfer" && "border-primary"
+                  "h-16 flex flex-col gap-1 border-2 transition-all",
+                  paymentMethod === "Transfer"
+                    ? "bg-blue-600 border-blue-700"
+                    : "border-slate-100"
                 )}
                 onClick={() => setPaymentMethod("Transfer")}
               >
@@ -299,12 +414,11 @@ export default function POSForm({ products }: { products: any[] }) {
             </div>
 
             <Button
-              className="w-full h-20 text-xl font-black shadow-xl uppercase tracking-widest transition-all active:scale-95"
-              size="lg"
+              className="w-full h-16 text-lg font-black bg-green-600 hover:bg-green-700 shadow-xl transition-all active:scale-95"
               disabled={loading || cart.length === 0}
               onClick={handleCheckout}
             >
-              {loading ? "Đang xử lý..." : "Thanh toán (F12)"}
+              {loading ? "ĐANG XỬ LÝ..." : "THANH TOÁN (F12)"}
             </Button>
           </CardContent>
         </Card>

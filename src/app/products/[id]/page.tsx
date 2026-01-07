@@ -5,59 +5,50 @@ import {
   ArrowLeft,
   Edit,
   Package,
-  DollarSign,
+  Layers,
+  Box,
+  History,
+  TrendingUp,
   AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Calendar,
-  FileText,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice, formatDate } from "@/lib/utils";
-
-interface ProductDetailPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 export default async function ProductDetailPage({
   params,
-}: ProductDetailPageProps) {
+}: {
+  params: Promise<{ id: string }>; // Khai báo dạng Promise cho Next.js 15+
+}) {
+  // Giải nén params
   const { id } = await params;
   const product = await getProductById(id);
 
-  // 1. Trả về 404 nếu không tìm thấy ID thật trong DB
-  if (!product) {
-    notFound();
-  }
+  if (!product) notFound();
 
-  // 2. Logic tính toán trạng thái kho (Xử lý trường hợp dữ liệu null từ DB)
-  const getStockStatus = (current: number | null, min: number | null) => {
-    const stock = current ?? 0;
-    const minStock = min ?? 0;
-    if (stock <= 0)
-      return { label: "Hết hàng", variant: "destructive" as const };
-    if (stock <= minStock)
-      return { label: "Sắp hết", variant: "warning" as const };
-    return { label: "Đủ hàng", variant: "success" as const };
-  };
-
-  const stockStatus = getStockStatus(product.current_stock, product.min_stock);
-
-  // 3. Tính tỷ lệ % cho thanh Progress bar (Tránh chia cho 0)
-  const calculateProgress = () => {
-    const current = product.current_stock ?? 0;
-    const max = product.max_stock || Math.max((product.min_stock ?? 0) * 3, 10);
-    return Math.min(100, (current / max) * 100);
-  };
+  // Tính toán lợi nhuận dự kiến
+  const profit = product.sale_price - (product.cost_price || 0);
+  const profitMargin =
+    product.sale_price > 0
+      ? ((profit / product.sale_price) * 100).toFixed(1)
+      : 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="container mx-auto py-6 space-y-6">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
             <Link href="/products">
@@ -65,314 +56,345 @@ export default async function ProductDetailPage({
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {product.name}
-            </h1>
-            <p className="text-muted-foreground">
-              Mã nội bộ:{" "}
-              <span className="font-mono font-medium">
-                {product.internal_code}
-              </span>
-            </p>
-          </div>
-        </div>
-        <Button asChild>
-          <Link href={`/products/${id}/edit`}>
-            <Edit className="h-4 w-4 mr-2" />
-            Chỉnh sửa sản phẩm
-          </Link>
-        </Button>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Tồn kho
-                </p>
-                <p className="text-2xl font-bold mt-1">
-                  {product.current_stock ?? 0}{" "}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {product.unit}
-                  </span>
-                </p>
-              </div>
-              <Badge variant={stockStatus.variant}>{stockStatus.label}</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground">
-              Giá bán lẻ
-            </p>
-            <p className="text-2xl font-bold mt-1 text-primary">
-              {formatPrice(product.sale_price)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground">
-              Hoạt động
-            </p>
-            <div className="flex items-center gap-2 mt-2">
-              {product.is_active ? (
-                <Badge className="bg-green-500 hover:bg-green-600">
-                  Đang kinh doanh
-                </Badge>
-              ) : (
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-slate-900">
+                {product.name}
+              </h1>
+              {!product.is_active && (
                 <Badge variant="destructive">Ngừng kinh doanh</Badge>
               )}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm font-medium text-muted-foreground">Barcode</p>
-            <p className="font-mono text-lg font-bold mt-1 truncate">
-              {product.barcode || "---"}
+            <p className="text-sm text-muted-foreground font-mono">
+              Mã: {product.internal_code}{" "}
+              {product.barcode ? `| Barcode: ${product.barcode}` : ""}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href={`/inventory-history/${id}`}>
+              <History className="h-4 w-4 mr-2" /> Thẻ kho
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href={`/products/${id}/edit`}>
+              <Edit className="h-4 w-4 mr-2" /> Chỉnh sửa
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* CỘT TRÁI: THÔNG TIN CHI TIẾT */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Basic Info */}
           <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="h-5 w-5 text-blue-500" />
-                Thông tin chi tiết
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Info className="h-5 w-5 text-blue-500" /> Thông tin cơ bản
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
-                <InfoItem label="Tên đầy đủ" value={product.name} />
-                <InfoItem label="Tên viết tắt" value={product.short_name} />
-                <InfoItem label="Danh mục" value={product.category} isBadge />
-                <InfoItem label="Đơn vị tính" value={product.unit} />
-                <InfoItem
-                  label="Ngày tạo hệ thống"
-                  value={formatDate(product.created_at)}
-                />
-                <InfoItem
-                  label="Cập nhật cuối"
-                  value={formatDate(product.updated_at)}
-                />
+            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">
+                  Đơn vị
+                </p>
+                <p className="font-semibold text-slate-700 text-lg">
+                  {product.unit}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Price & Inventory Details */}
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <DollarSign className="h-5 w-5 text-green-500" />
-                Quản lý Giá & Kho
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Giá nhập (vốn)
-                    </p>
-                    <p className="text-xl font-semibold">
-                      {formatPrice(product.cost_price || 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Giá bán niêm yết
-                    </p>
-                    <p className="text-xl font-semibold text-primary">
-                      {formatPrice(product.sale_price)}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-4 border-l pl-0 md:pl-8 border-none md:border-solid">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Mức tồn tối thiểu
-                    </p>
-                    <p className="text-lg font-medium">
-                      {product.min_stock} {product.unit}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Mức tồn tối đa
-                    </p>
-                    <p className="text-lg font-medium">
-                      {product.max_stock
-                        ? `${product.max_stock} ${product.unit}`
-                        : "Không giới hạn"}
-                    </p>
-                  </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">
+                  Danh mục
+                </p>
+                <p className="mt-1">
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-50 text-blue-700 border-blue-100"
+                  >
+                    {product.category || "Chưa phân loại"}
+                  </Badge>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">
+                  Kiểu quản lý
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  {product.manage_by_batch ? (
+                    <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+                      <Layers className="h-3 w-3 mr-1" /> Theo lô hàng
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-slate-100 text-slate-700">
+                      <Box className="h-3 w-3 mr-1" /> Tổng hợp
+                    </Badge>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Ghi chú */}
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5 text-gray-500" />
-                Ghi chú nội bộ
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <p className="text-sm whitespace-pre-wrap text-muted-foreground italic">
-                {product.notes || "Không có ghi chú cho sản phẩm này."}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-muted/50 border-b">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold">
-                Cảnh báo tồn kho
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Mức độ lấp đầy</span>
-                  <span className="font-bold">
-                    {product.current_stock} / {product.max_stock || "∞"}
-                  </span>
-                </div>
-                <div className="h-3 bg-muted rounded-full overflow-hidden border">
-                  <div
-                    className={`h-full transition-all ${
-                      stockStatus.variant === "destructive"
-                        ? "bg-red-500"
-                        : stockStatus.variant === "warning"
-                        ? "bg-amber-500"
-                        : "bg-green-500"
-                    }`}
-                    style={{ width: `${calculateProgress()}%` }}
-                  />
-                </div>
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase">
+                  Ngày tạo
+                </p>
+                <p className="text-sm text-slate-600 mt-1">
+                  {formatDate(product.created_at)}
+                </p>
               </div>
+            </CardContent>
+            {product.notes && (
+              <CardContent className="pt-0">
+                <Separator className="mb-4" />
+                <p className="text-xs font-bold text-slate-400 uppercase mb-2">
+                  Ghi chú / Công dụng
+                </p>
+                <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-dashed">
+                  {product.notes}
+                </p>
+              </CardContent>
+            )}
+          </Card>
 
-              {stockStatus.variant !== "success" && (
-                <div
-                  className={`p-3 rounded-lg border flex gap-2 items-start ${
-                    stockStatus.variant === "destructive"
-                      ? "bg-red-50 border-red-200 text-red-800"
-                      : "bg-amber-50 border-amber-200 text-amber-800"
-                  }`}
-                >
-                  <AlertTriangle className="h-5 w-5 shrink-0" />
-                  <p className="text-xs font-medium">
-                    {stockStatus.variant === "destructive"
-                      ? "Sản phẩm đã hết hàng. Vui lòng tạo phiếu nhập kho ngay."
-                      : "Số lượng tồn kho đang dưới mức an toàn."}
-                  </p>
+          {/* HIỂN THỊ THEO LÔ HOẶC THEO TỔNG HỢP */}
+          <Card>
+            <CardHeader className="border-b bg-slate-50/30">
+              <CardTitle className="text-lg flex items-center gap-2">
+                {product.manage_by_batch ? (
+                  <>
+                    <Layers className="h-5 w-5 text-purple-600" /> Tồn kho chi
+                    tiết theo lô
+                  </>
+                ) : (
+                  <>
+                    <History className="h-5 w-5 text-blue-600" /> Lịch sử biến
+                    động
+                  </>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {product.manage_by_batch ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/50">
+                      <TableHead className="pl-6">Số lô (Batch No.)</TableHead>
+                      <TableHead>Hạn sử dụng</TableHead>
+                      <TableHead>Trạng thái</TableHead>
+                      <TableHead className="text-right pr-6">
+                        Số lượng tồn
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {product.product_batches &&
+                    product.product_batches.length > 0 ? (
+                      product.product_batches.map((batch: any) => {
+                        const isExpired =
+                          new Date(batch.expiry_date) < new Date();
+                        const isNearExpiry =
+                          !isExpired &&
+                          new Date(batch.expiry_date) <
+                            new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+                        return (
+                          <TableRow
+                            key={batch.id}
+                            className="hover:bg-slate-50/50 transition-colors"
+                          >
+                            <TableCell className="font-mono font-bold text-slate-700 pl-6">
+                              {batch.batch_number}
+                            </TableCell>
+                            <TableCell
+                              className={cn(
+                                "font-medium",
+                                isExpired
+                                  ? "text-red-600"
+                                  : isNearExpiry
+                                  ? "text-amber-600"
+                                  : "text-slate-600"
+                              )}
+                            >
+                              {formatDate(batch.expiry_date)}
+                            </TableCell>
+                            <TableCell>
+                              {isExpired ? (
+                                <Badge
+                                  variant="destructive"
+                                  className="text-[10px]"
+                                >
+                                  Hết hạn
+                                </Badge>
+                              ) : isNearExpiry ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-amber-200 text-amber-700 bg-amber-50"
+                                >
+                                  Sắp hết hạn
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-green-200 text-green-700 bg-green-50"
+                                >
+                                  An toàn
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-blue-600 pr-6">
+                              {batch.quantity}{" "}
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {product.unit}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-12">
+                          <div className="flex flex-col items-center text-slate-400">
+                            <Package className="h-10 w-10 mb-2 opacity-20" />
+                            <p className="italic text-sm">
+                              Chưa có thông tin lô hàng. Vui lòng tạo phiếu nhập
+                              kho.
+                            </p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-12 text-center space-y-4">
+                  <div className="inline-flex p-4 rounded-full bg-blue-50">
+                    <Box className="h-8 w-8 text-blue-500" />
+                  </div>
+                  <div className="max-w-xs mx-auto">
+                    <p className="font-semibold text-slate-700">
+                      Sản phẩm quản lý tổng hợp
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      Hệ thống không theo dõi hạn sử dụng riêng lẻ cho sản phẩm
+                      này. Tổng tồn kho được cập nhật dựa trên giao dịch
+                      xuất/nhập.
+                    </p>
+                    <Button
+                      variant="link"
+                      className="mt-2 text-blue-600"
+                      asChild
+                    >
+                      <Link href={`/inventory-history/${id}`}>
+                        Xem thẻ kho chi tiết
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
+        </div>
 
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="text-sm uppercase tracking-wider font-semibold">
-                Kiểm soát bán hàng
+        {/* CỘT PHẢI: KHO & GIÁ */}
+        <div className="space-y-6">
+          {/* CARD TỒN KHO */}
+          <Card
+            className={cn(
+              "border-2",
+              product.current_stock <= product.min_stock
+                ? "border-red-200 bg-red-50/30"
+                : "border-primary/10 bg-primary/5"
+            )}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-widest text-slate-500 flex justify-between items-center">
+                Tổng tồn thực tế
+                {product.current_stock <= product.min_stock && (
+                  <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4 space-y-3">
-              <StatusRow
-                icon={
-                  <CheckCircle
-                    className={
-                      product.is_active ? "text-green-500" : "text-gray-300"
-                    }
-                    size={18}
-                  />
-                }
-                label="Cho phép kinh doanh"
-                active={product.is_active}
-              />
-              <StatusRow
-                icon={
-                  <DollarSign
-                    className={
-                      product.can_sell ? "text-blue-500" : "text-gray-300"
-                    }
-                    size={18}
-                  />
-                }
-                label="Cho phép bán lẻ"
-                active={product.can_sell}
-              />
+            <CardContent>
+              <div className="flex justify-between items-end">
+                <h2
+                  className={cn(
+                    "text-5xl font-black tracking-tighter",
+                    product.current_stock <= product.min_stock
+                      ? "text-red-600"
+                      : "text-slate-900"
+                  )}
+                >
+                  {product.current_stock}
+                </h2>
+                <span className="text-slate-500 font-bold mb-1 ml-2 uppercase text-sm">
+                  {product.unit}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm border-t border-dashed pt-4">
+                <div className="flex justify-between text-slate-500">
+                  <span>Định mức tối thiểu:</span>
+                  <span className="font-bold">
+                    {product.min_stock} {product.unit}
+                  </span>
+                </div>
+                {product.max_stock && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Định mức tối đa:</span>
+                    <span className="font-bold">
+                      {product.max_stock} {product.unit}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CARD GIÁ CẢ */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs uppercase tracking-widest text-slate-500">
+                Thông tin tài chính
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-slate-500">Giá bán lẻ</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatPrice(product.sale_price)}
+                </p>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-400 uppercase">
+                    Giá nhập TB
+                  </p>
+                  <p className="font-bold text-slate-700">
+                    {formatPrice(product.cost_price || 0)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 uppercase">
+                    Lợi nhuận dự kiến
+                  </p>
+                  <p className="font-bold text-green-600">
+                    +{formatPrice(profit)}
+                  </p>
+                </div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg flex items-center justify-between border border-green-100">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                  <span className="text-xs font-bold text-green-800 uppercase">
+                    Tỷ suất LN
+                  </span>
+                </div>
+                <span className="text-lg font-black text-green-700">
+                  {profitMargin}%
+                </span>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
-
-// Component hỗ trợ hiển thị dòng thông tin
-function InfoItem({
-  label,
-  value,
-  isBadge = false,
-}: {
-  label: string;
-  value?: string | null;
-  isBadge?: boolean;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-muted-foreground uppercase">
-        {label}
-      </p>
-      {isBadge && value ? (
-        <Badge variant="secondary">{value}</Badge>
-      ) : (
-        <p className="text-sm font-semibold">{value || "---"}</p>
-      )}
-    </div>
-  );
-}
-
-// Component hỗ trợ hiển thị trạng thái sidebar
-function StatusRow({
-  icon,
-  label,
-  active,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between py-1">
-      <div className="flex items-center gap-2 text-sm">
-        {icon}
-        <span>{label}</span>
-      </div>
-      <div
-        className={`h-2 w-2 rounded-full ${
-          active ? "bg-green-500" : "bg-red-500"
-        }`}
-      />
     </div>
   );
 }
