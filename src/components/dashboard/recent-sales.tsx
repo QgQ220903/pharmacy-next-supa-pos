@@ -1,54 +1,69 @@
-'use client'
+import { supabaseAdmin } from "@/lib/supabase-server";
+import { formatPrice } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-import { Calendar, User } from 'lucide-react'
-
-export default function RecentSales() {
-  const sales = [
-    { id: 'HD001', customer: 'Nguyễn Văn A', amount: 1250000, time: '09:30', items: 3 },
-    { id: 'HD002', customer: 'Trần Thị B', amount: 2850000, time: '10:15', items: 5 },
-    { id: 'HD003', customer: 'Khách lẻ', amount: 450000, time: '11:45', items: 2 },
-    { id: 'HD004', customer: 'Phạm Văn C', amount: 1890000, time: '14:20', items: 4 },
-  ]
+export default async function RecentSales() {
+  const supabase = await supabaseAdmin;
+  const { data: sales } = await supabase
+    .from("sales")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(5);
 
   return (
-    <div className="border rounded-lg p-6 bg-card">
-      <h3 className="font-semibold text-lg mb-4">Hóa đơn gần đây</h3>
-      <div className="space-y-4">
-        {sales.map((sale) => (
-          <div 
-            key={sale.id} 
-            className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg border flex items-center justify-center">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="font-medium">{sale.id}</div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="h-3 w-3" />
-                  <span>{sale.customer}</span>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Giao dịch gần đây</CardTitle>
+          <CardDescription>5 giao dịch mới nhất</CardDescription>
+        </div>
+        <Button variant="ghost" size="sm">
+          Xem tất cả
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {sales?.map((sale) => (
+            <div key={sale.id} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-muted">
+                    {sale.customer_name?.substring(0, 2).toUpperCase() || "KL"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {sale.customer_name || "Khách lẻ"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {sale.sale_code}
+                  </p>
                 </div>
               </div>
-            </div>
-            
-            <div className="text-right">
-              <div className="font-semibold">
-                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(sale.amount)}
+              <div className="flex flex-col items-end gap-1">
+                <p className="text-sm font-bold">
+                  {formatPrice(sale.final_amount)}
+                </p>
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                >
+                  Thành công
+                </Badge>
               </div>
-              <div className="text-sm text-muted-foreground">
-                {sale.items} sản phẩm • {sale.time}
-              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      
-      <div className="mt-4 pt-4 border-t">
-        <button className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium w-full text-center">
-          Xem tất cả hóa đơn →
-        </button>
-      </div>
-    </div>
-  )
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

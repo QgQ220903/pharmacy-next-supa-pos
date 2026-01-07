@@ -88,3 +88,28 @@ export async function getProductBatchesAction(productId: string) {
   if (error) return { success: false, data: [] };
   return { success: true, data };
 }
+
+// Trong app/actions/sales.ts (Tạo mới nếu chưa có)
+export async function getSaleDetailAction(saleId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("sales")
+    .select(`*, items:sale_items(*, products(name, unit))`)
+    .eq("id", saleId)
+    .single();
+  return { success: !error, data };
+}
+
+export async function getSalesAction() {
+  const supabase = await supabaseAdmin;
+  try {
+    const { data, error } = await supabase
+      .from("sales")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+}

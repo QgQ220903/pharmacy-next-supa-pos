@@ -27,11 +27,8 @@ const navItems = [
   { name: "Sản phẩm", href: "/products", icon: Package },
   { name: "Bán hàng", href: "/pos", icon: ShoppingCart },
   { name: "Nhập kho", href: "/entries", icon: Truck },
-  { name: "Kiểm kê", href: "/inventory", icon: Activity },
-  { name: "Khách hàng", href: "/customers", icon: Users },
-  { name: "Báo cáo", href: "/reports", icon: BarChart3 },
-  { name: "Hóa đơn", href: "/invoices", icon: FileText },
-  { name: "Cài đặt", href: "/settings", icon: Settings },
+  { name: "Kiểm kê", href: "/inventory/history", icon: Activity },
+  { name: "Hóa đơn", href: "/sales", icon: FileText },
 ];
 
 export default function Sidebar() {

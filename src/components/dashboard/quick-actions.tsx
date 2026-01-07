@@ -1,68 +1,83 @@
-'use client'
+"use client";
 
-import { Plus, ShoppingCart, Package, BarChart3, FileText, Settings } from 'lucide-react'
+import { Plus, ShoppingCart, Package, FileText } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function QuickActions() {
+  const router = useRouter();
+
   const actions = [
-    { 
-      label: 'Bán hàng', 
-      icon: ShoppingCart, 
-      href: '/pos',
-      description: 'Tạo hóa đơn mới'
+    {
+      label: "Bán hàng",
+      icon: ShoppingCart,
+      href: "/pos",
+      description: "Tạo hóa đơn mới",
     },
-    { 
-      label: 'Nhập kho', 
-      icon: Package, 
-      href: '/entries',
-      description: 'Thêm sản phẩm'
+    {
+      label: "Nhập kho",
+      icon: Package,
+      href: "/entries",
+      description: "Nhập sản phẩm mới",
     },
-    { 
-      label: 'Thêm thuốc', 
-      icon: Plus, 
-      href: '/products/new',
-      description: 'Thêm sản phẩm mới'
+    {
+      label: "Thêm thuốc",
+      icon: Plus,
+      href: "/products/new",
+      description: "Thêm sản phẩm mới",
     },
-    { 
-      label: 'Báo cáo', 
-      icon: BarChart3, 
-      href: '/reports',
-      description: 'Xem báo cáo'
+    {
+      label: "Hóa đơn",
+      icon: FileText,
+      href: "/sales",
+      description: "Quản lý hóa đơn",
     },
-    { 
-      label: 'Hóa đơn', 
-      icon: FileText, 
-      href: '/invoices',
-      description: 'Quản lý hóa đơn'
-    },
-    { 
-      label: 'Cài đặt', 
-      icon: Settings, 
-      href: '/settings',
-      description: 'Cấu hình hệ thống'
-    },
-  ]
+  ];
+
+  const handleClick = (href: string) => {
+    router.push(href);
+  };
 
   return (
-    <div className="border rounded-lg p-4 bg-card">
-      <h3 className="font-semibold mb-3 text-foreground">Thao tác nhanh</h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {actions.map((action, index) => {
-          const Icon = action.icon
-          return (
-            <a
-              key={index}
-              href={action.href}
-              className="flex flex-col items-center p-4 border rounded-lg hover:bg-accent transition-colors text-center group"
-            >
-              <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center mb-2 group-hover:bg-secondary/80 transition-colors">
-                <Icon className="h-5 w-5 text-secondary-foreground" />
-              </div>
-              <span className="text-sm font-medium text-foreground">{action.label}</span>
-              <span className="text-xs text-muted-foreground mt-1">{action.description}</span>
-            </a>
-          )
-        })}
-      </div>
-    </div>
-  )
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle>Thao tác nhanh</CardTitle>
+        <CardDescription>
+          Truy cập nhanh các tính năng quan trọng
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          {actions.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={index}
+                onClick={() => handleClick(action.href)}
+                className="group flex flex-col items-center p-5 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors"
+              >
+                <div className="mb-4 p-4 rounded-full bg-muted">
+                  <Icon className="h-9 w-9 text-foreground" />
+                </div>
+                <div className="text-center space-y-2">
+                  <span className="text-base font-semibold text-foreground">
+                    {action.label}
+                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    {action.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
