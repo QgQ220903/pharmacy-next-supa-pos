@@ -6,13 +6,20 @@ import {
   User,
   CreditCard,
   Banknote,
-  AlertCircle,
-  Layers,
   Package,
+  Search,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -28,19 +35,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ProductSearch } from "@/components/products/ProductSearch";
-import { formatPrice, cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { formatPrice } from "@/lib/utils";
 import { createSaleAction, getProductBatchesAction } from "@/app/actions/sales";
 import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
 
 export default function POSForm({ products }: { products: any[] }) {
   const [cart, setCart] = useState<any[]>([]);
   const [customer, setCustomer] = useState({ name: "", phone: "" });
   const [discount, setDiscount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // 1. Phím tắt F12 thanh toán
+  // Filter products based on search
+  const filteredProducts = useMemo(() => {
+    if (!searchQuery) return products.slice(0, 20); // Limit initial display
+    return products
+      .filter(
+        (product) =>
+          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          product.code?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .slice(0, 20);
+  }, [products, searchQuery]);
+
+  // Phím tắt F12 thanh toán
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F12") {
@@ -52,14 +74,13 @@ export default function POSForm({ products }: { products: any[] }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cart, customer, discount, paymentMethod]);
 
-  // 2. Logic cập nhật số lượng (Kiểm tra tồn theo Lô hoặc theo Tổng)
+  // Cập nhật số lượng
   const updateQuantity = (cartItemId: string, qty: number) => {
     setCart((prev) =>
       prev.map((item) => {
         if (item.cartId !== cartItemId) return item;
 
         let newQty = qty;
-        // Kiểm tra tồn kho khả dụng
         const maxAvailable = item.manage_by_batch
           ? item.selected_batch_qty
           : item.current_stock;
@@ -75,7 +96,7 @@ export default function POSForm({ products }: { products: any[] }) {
     );
   };
 
-  // 3. Thêm sản phẩm vào giỏ hàng (Xử lý Batch)
+  // Thêm sản phẩm vào giỏ
   const addToCart = async (product: any) => {
     if (product.current_stock <= 0) {
       return toast.error("Sản phẩm đã hết hàng!");
@@ -84,19 +105,14 @@ export default function POSForm({ products }: { products: any[] }) {
     setLoading(true);
     try {
       if (product.manage_by_batch) {
-        // Lấy danh sách lô còn hạn và còn hàng
         const res = await getProductBatchesAction(product.id);
         if (!res.success || res.data.length === 0) {
-          toast.error(
-            "Sản phẩm theo lô nhưng không tìm thấy lô hàng khả dụng!"
-          );
+          toast.error("Không tìm thấy lô hàng khả dụng!");
           return;
         }
 
         const batches = res.data;
-        const firstBatch = batches[0]; // Lô ưu tiên (HSD gần nhất)
-
-        // CartId kết hợp Product + Batch để phân biệt nếu cùng 1 thuốc nhưng chọn 2 lô khác nhau
+        const firstBatch = batches[0];
         const cartId = `${product.id}-${firstBatch.id}`;
         const existing = cart.find((i) => i.cartId === cartId);
 
@@ -117,7 +133,6 @@ export default function POSForm({ products }: { products: any[] }) {
           ]);
         }
       } else {
-        // Hàng thường không theo lô
         const cartId = product.id;
         const existing = cart.find((i) => i.cartId === cartId);
         if (existing) {
@@ -134,14 +149,14 @@ export default function POSForm({ products }: { products: any[] }) {
   const removeFromCart = (cartId: string) =>
     setCart((prev) => prev.filter((item) => item.cartId !== cartId));
 
-  // 4. Tính toán tiền
+  // Tính toán tiền
   const totalAmount = useMemo(
     () => cart.reduce((sum, item) => sum + item.sale_price * item.quantity, 0),
     [cart]
   );
   const finalAmount = Math.max(0, totalAmount - discount);
 
-  // 5. Xử lý thanh toán
+  // Xử lý thanh toán
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("Giỏ hàng đang trống");
     if (loading) return;
@@ -169,71 +184,102 @@ export default function POSForm({ products }: { products: any[] }) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-140px)]">
-      {/* CỘT TRÁI: Tìm kiếm & Giỏ hàng */}
-      <div className="lg:col-span-3 flex flex-col gap-4 min-h-0">
-        <Card className="shadow-sm border-none bg-background p-2">
-          <ProductSearch products={products} onSelect={addToCart} />
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Cột trái: Tìm kiếm sản phẩm */}
+      <div className="lg:col-span-2 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Tìm kiếm sản phẩm</CardTitle>
+            <CardDescription>Nhập tên hoặc mã sản phẩm</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm kiếm sản phẩm..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-6 max-h-[400px] overflow-y-auto p-2">
+              {filteredProducts.map((product) => (
+                <button
+                  key={product.id}
+                  onClick={() => addToCart(product)}
+                  disabled={product.current_stock <= 0}
+                  className="flex flex-col items-center p-4 rounded-lg border hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="p-3 rounded-full bg-primary/10 mb-3">
+                    <Package className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-sm font-medium line-clamp-2">
+                      {product.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatPrice(product.sale_price)}
+                    </p>
+                    <Badge
+                      variant={
+                        product.current_stock > 0 ? "default" : "destructive"
+                      }
+                      className="text-xs"
+                    >
+                      {product.current_stock} {product.unit}
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
         </Card>
 
-        <Card className="flex-1 overflow-hidden flex flex-col shadow-sm border-slate-200">
-          <CardHeader className="py-3 border-b bg-slate-50/50">
-            <CardTitle className="text-xs font-bold flex items-center gap-2 uppercase tracking-wider">
-              <ShoppingCart className="h-4 w-4 text-blue-600" />
-              Giỏ hàng ({cart.length})
-            </CardTitle>
+        {/* Giỏ hàng */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  Giỏ hàng
+                </CardTitle>
+                <CardDescription>{cart.length} sản phẩm</CardDescription>
+              </div>
+              {cart.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setCart([])}>
+                  Xóa tất cả
+                </Button>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-auto">
-            <Table>
-              <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
-                <TableRow className="bg-slate-50/30">
-                  <TableHead className="text-xs uppercase font-bold">
-                    Sản phẩm / Thông tin lô
-                  </TableHead>
-                  <TableHead className="w-24 text-center text-xs uppercase font-bold">
-                    ĐVT
-                  </TableHead>
-                  <TableHead className="w-32 text-center text-xs uppercase font-bold">
-                    Số lượng
-                  </TableHead>
-                  <TableHead className="text-right text-xs uppercase font-bold">
-                    Đơn giá
-                  </TableHead>
-                  <TableHead className="text-right text-xs uppercase font-bold">
-                    Thành tiền
-                  </TableHead>
-                  <TableHead className="w-10 text-center"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cart.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="h-40 text-center text-slate-400 italic"
-                    >
-                      Chưa có thuốc nào trong giỏ hàng. Quét mã hoặc tìm kiếm để
-                      thêm.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  cart.map((item) => (
-                    <TableRow
-                      key={item.cartId}
-                      className="hover:bg-blue-50/30 transition-colors"
-                    >
-                      <TableCell className="py-3">
-                        <div className="space-y-1">
-                          <div className="font-bold text-slate-800">
-                            {item.name}
-                          </div>
-                          {item.manage_by_batch ? (
-                            <div className="flex items-center gap-2">
-                              <Layers size={12} className="text-blue-500" />
+          <CardContent>
+            {cart.length === 0 ? (
+              <div className="text-center py-12">
+                <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold">Giỏ hàng trống</h3>
+                <p className="text-muted-foreground">
+                  Thêm sản phẩm để bắt đầu bán hàng
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {cart.map((item) => (
+                  <div
+                    key={item.cartId}
+                    className="flex items-center gap-4 p-4 rounded-lg border"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-medium">{item.name}</h4>
+                          {item.manage_by_batch && (
+                            <div className="flex items-center gap-2 mt-1">
                               <Select
                                 value={item.selected_batch_id}
                                 onValueChange={(val) => {
-                                  const b = item.available_batches.find(
+                                  const batch = item.available_batches.find(
                                     (x: any) => x.id === val
                                   );
                                   setCart((prev) =>
@@ -243,50 +289,58 @@ export default function POSForm({ products }: { products: any[] }) {
                                             ...i,
                                             selected_batch_id: val,
                                             selected_batch_number:
-                                              b.batch_number,
-                                            selected_batch_qty: b.quantity,
+                                              batch.batch_number,
+                                            selected_batch_qty: batch.quantity,
                                           }
                                         : i
                                     )
                                   );
                                 }}
                               >
-                                <SelectTrigger className="h-7 text-[10px] w-[200px] border-blue-100 bg-blue-50/50">
-                                  <SelectValue />
+                                <SelectTrigger className="h-8 text-xs w-[180px]">
+                                  <SelectValue placeholder="Chọn lô" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {item.available_batches?.map((b: any) => (
-                                    <SelectItem
-                                      key={b.id}
-                                      value={b.id}
-                                      className="text-[11px]"
-                                    >
-                                      Lô: {b.batch_number} - HSD:{" "}
+                                  {item.available_batches?.map((batch: any) => (
+                                    <SelectItem key={batch.id} value={batch.id}>
+                                      Lô {batch.batch_number} - HSD:{" "}
                                       {new Date(
-                                        b.expiry_date
+                                        batch.expiry_date
                                       ).toLocaleDateString("vi-VN")}{" "}
-                                      (Còn {b.quantity})
+                                      (Còn {batch.quantity})
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
-                              <Package size={12} /> Hàng không quản lý lô
-                            </div>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-center text-slate-500 font-medium text-sm">
-                        {item.unit}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col items-center gap-1">
+                        <div className="text-right">
+                          <p className="font-bold">
+                            {formatPrice(item.sale_price * item.quantity)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatPrice(item.sale_price)} × {item.quantity}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() =>
+                              updateQuantity(item.cartId, item.quantity - 1)
+                            }
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
                           <Input
                             type="number"
                             value={item.quantity}
-                            className="h-8 text-center font-black border-slate-300 focus:ring-blue-500 w-20"
+                            className="w-20 text-center"
                             onChange={(e) =>
                               updateQuantity(
                                 item.cartId,
@@ -294,132 +348,138 @@ export default function POSForm({ products }: { products: any[] }) {
                               )
                             }
                           />
-                          <span className="text-[9px] text-slate-400">
-                            Tối đa:{" "}
-                            {item.manage_by_batch
-                              ? item.selected_batch_qty
-                              : item.current_stock}
-                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() =>
+                              updateQuantity(item.cartId, item.quantity + 1)
+                            }
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-slate-600">
-                        {formatPrice(item.sale_price)}
-                      </TableCell>
-                      <TableCell className="text-right font-black text-blue-700">
-                        {formatPrice(item.sale_price * item.quantity)}
-                      </TableCell>
-                      <TableCell className="text-center">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-slate-300 hover:text-red-500"
+                          className="text-destructive"
                           onClick={() => removeFromCart(item.cartId)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* CỘT PHẢI: Thanh toán */}
-      <div className="lg:col-span-1 flex flex-col gap-4">
-        <Card className="shadow-lg border-t-4 border-t-blue-600 flex flex-col h-full">
-          <CardContent className="p-5 flex flex-col flex-1">
-            <div className="space-y-4 mb-6">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase flex items-center gap-2">
-                <User className="h-4 w-4" /> Khách hàng
-              </h3>
+      {/* Cột phải: Thanh toán */}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Thông tin khách hàng</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="customer-name">Tên khách hàng</Label>
               <Input
-                placeholder="Tên khách hàng"
-                className="bg-slate-50 focus:bg-white"
+                id="customer-name"
+                placeholder="Nhập tên khách hàng"
                 value={customer.name}
                 onChange={(e) =>
                   setCustomer({ ...customer, name: e.target.value })
                 }
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-phone">Số điện thoại</Label>
               <Input
-                placeholder="Số điện thoại"
-                className="bg-slate-50 focus:bg-white"
+                id="customer-phone"
+                placeholder="Nhập số điện thoại"
                 value={customer.phone}
                 onChange={(e) =>
                   setCustomer({ ...customer, phone: e.target.value })
                 }
               />
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-3 border-t border-dashed pt-4 flex-1 text-sm font-medium text-slate-600">
+        <Card>
+          <CardHeader>
+            <CardTitle>Thanh toán</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
               <div className="flex justify-between">
-                <span>Tạm tính:</span>
-                <span>{formatPrice(totalAmount)}</span>
+                <span className="text-muted-foreground">Tạm tính:</span>
+                <span className="font-medium">{formatPrice(totalAmount)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span>Chiết khấu:</span>
-                <div className="flex items-center gap-1 border rounded bg-white px-2 py-1">
-                  <span className="text-red-500 font-bold">-</span>
-                  <input
+
+              <div className="space-y-2">
+                <Label htmlFor="discount">Chiết khấu</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="discount"
                     type="number"
-                    className="w-20 text-right font-bold text-red-500 outline-none"
+                    placeholder="0"
                     value={discount}
                     onChange={(e) => setDiscount(Number(e.target.value))}
+                    className="text-right"
                   />
+                  <span className="text-muted-foreground">VND</span>
                 </div>
               </div>
-              <div className="pt-4 mt-4 border-t-2 border-slate-100">
-                <span className="text-[10px] font-black text-slate-400 uppercase">
-                  Tổng cộng thanh toán
-                </span>
-                <div className="text-3xl font-black text-blue-600 text-right tracking-tight">
-                  {formatPrice(finalAmount)}
-                </div>
+
+              <Separator />
+
+              <div className="flex justify-between text-lg font-bold">
+                <span>Tổng cộng:</span>
+                <span className="text-primary">{formatPrice(finalAmount)}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 my-6">
-              <Button
-                variant={paymentMethod === "Cash" ? "default" : "outline"}
-                className={cn(
-                  "h-16 flex flex-col gap-1 border-2 transition-all",
-                  paymentMethod === "Cash"
-                    ? "bg-blue-600 border-blue-700"
-                    : "border-slate-100"
-                )}
-                onClick={() => setPaymentMethod("Cash")}
-              >
-                <Banknote className="h-5 w-5" />
-                <span className="text-[10px] font-bold uppercase">
-                  Tiền mặt
-                </span>
-              </Button>
-              <Button
-                variant={paymentMethod === "Transfer" ? "default" : "outline"}
-                className={cn(
-                  "h-16 flex flex-col gap-1 border-2 transition-all",
-                  paymentMethod === "Transfer"
-                    ? "bg-blue-600 border-blue-700"
-                    : "border-slate-100"
-                )}
-                onClick={() => setPaymentMethod("Transfer")}
-              >
-                <CreditCard className="h-5 w-5" />
-                <span className="text-[10px] font-bold uppercase">
-                  Chuyển khoản
-                </span>
-              </Button>
+            <div className="space-y-3">
+              <h4 className="font-medium">Phương thức thanh toán</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant={paymentMethod === "cash" ? "default" : "outline"}
+                  className="h-12 flex flex-col gap-1"
+                  onClick={() => setPaymentMethod("cash")}
+                >
+                  <Banknote className="h-5 w-5" />
+                  <span className="text-xs">Tiền mặt</span>
+                </Button>
+                <Button
+                  variant={paymentMethod === "transfer" ? "default" : "outline"}
+                  className="h-12 flex flex-col gap-1"
+                  onClick={() => setPaymentMethod("transfer")}
+                >
+                  <CreditCard className="h-5 w-5" />
+                  <span className="text-xs">Chuyển khoản</span>
+                </Button>
+              </div>
             </div>
 
             <Button
-              className="w-full h-16 text-lg font-black bg-green-600 hover:bg-green-700 shadow-xl transition-all active:scale-95"
+              size="lg"
+              className="w-full h-14 text-lg font-bold"
               disabled={loading || cart.length === 0}
               onClick={handleCheckout}
             >
-              {loading ? "ĐANG XỬ LÝ..." : "THANH TOÁN (F12)"}
+              {loading
+                ? "Đang xử lý..."
+                : `Thanh toán ${formatPrice(finalAmount)}`}
             </Button>
+
+            <div className="text-center text-xs text-muted-foreground">
+              Nhấn <kbd className="px-2 py-1 bg-muted rounded">F12</kbd> để
+              thanh toán nhanh
+            </div>
           </CardContent>
         </Card>
       </div>

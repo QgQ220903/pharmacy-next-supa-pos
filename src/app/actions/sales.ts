@@ -113,3 +113,53 @@ export async function getSalesAction() {
     return { success: false, message: error.message };
   }
 }
+
+// Thêm vào app/actions/sales.ts
+export async function getSaleDetailAction2(saleId: string) {
+  try {
+    const supabase = await supabaseAdmin;
+
+    // Lấy thông tin hóa đơn với chi tiết items
+    const { data: sale, error: saleError } = await supabase
+      .from("sales")
+      .select(
+        `
+        *,
+        items:sale_items(
+          *,
+          products:product_id(name, unit),
+          batch:batch_id(batch_number, expiry_date)
+        )
+      `
+      )
+      .eq("id", saleId)
+      .single();
+
+    if (saleError) throw saleError;
+
+    // Format lại dữ liệu items để dễ xử lý
+    const formattedItems = (sale.items || []).map((item: any) => ({
+      id: item.id,
+      product_id: item.product_id,
+      name: item.products?.name || "",
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+      unit: item.products?.unit || item.unit || "",
+      batch_number: item.batch?.batch_number,
+      expiry_date: item.batch?.expiry_date,
+      products: item.products,
+    }));
+
+    return {
+      success: true,
+      data: {
+        ...sale,
+        items: formattedItems,
+      },
+    };
+  } catch (error: any) {
+    console.error("Get sale detail error:", error);
+    return { success: false, message: error.message };
+  }
+}
