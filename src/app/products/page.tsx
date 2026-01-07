@@ -40,7 +40,7 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
 
   // Gọi API với phân trang
   const [{ products, totalCount }, categories, stats] = await Promise.all([
-    getProducts(filters, currentPage, pageSize),
+    getProducts(filters, currentPage),
     getProductCategories(),
     getProductStats(),
   ]);
