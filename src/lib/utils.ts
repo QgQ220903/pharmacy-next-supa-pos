@@ -12,6 +12,14 @@ export function formatPrice(price: number): string {
   }).format(price);
 }
 
+// lib/utils.ts
+export function formatCompactNumber(value: number): string {
+  if (value >= 1000000000) return `${(value / 1000000000).toFixed(1)} tỷ`;
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)} tr`;
+  return new Intl.NumberFormat("vi-VN").format(value);
+}
+
+
 export function formatDate(date: string): string {
   return new Date(date).toLocaleDateString("vi-VN", {
     day: "2-digit",

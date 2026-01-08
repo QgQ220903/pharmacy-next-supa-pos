@@ -10,6 +10,7 @@ import { StatsCards } from "@/components/products/StatsCards";
 import { ProductActions } from "@/components/products/ProductActions";
 import { PaginationControl } from "@/components/products/PaginationControl";
 import ProductsLoading from "./loading";
+import { ProductFilters as ProductFiltersType } from "@/types"; // Import type
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -18,6 +19,8 @@ interface ProductsPageProps {
     category?: string;
     is_active?: string;
     low_stock?: string;
+    min_price?: string; // THÊM DÒNG NÀY
+    max_price?: string; // THÊM DÒNG NÀY
   }>;
 }
 
@@ -26,7 +29,8 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
   const currentPage = Number(params.page) || 1;
   const pageSize = 10;
 
-  const filters = {
+  // Tạo filters object đúng kiểu dữ liệu
+  const filters: ProductFiltersType = {
     search: params.search || "",
     category: params.category || "",
     is_active:
@@ -36,7 +40,15 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
         ? false
         : undefined,
     low_stock: params.low_stock === "true",
+    // QUAN TRỌNG: Parse giá từ string sang number
+    min_price: params.min_price ? Number(params.min_price) : undefined,
+    max_price: params.max_price ? Number(params.max_price) : undefined,
   };
+
+  // Debug để kiểm tra
+  console.log("Filters from URL:", filters);
+  console.log("min_price:", filters.min_price, "type:", typeof filters.min_price);
+  console.log("max_price:", filters.max_price, "type:", typeof filters.max_price);
 
   // Gọi API với phân trang
   const [{ products, totalCount }, categories, stats] = await Promise.all([

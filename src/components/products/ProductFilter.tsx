@@ -34,7 +34,7 @@ export function ProductFilters({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
-
+  
   const createQueryString = useCallback(
     (paramsToUpdate: Record<string, any>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -52,10 +52,25 @@ export function ProductFilters({
     [searchParams]
   );
 
+  // Debounce cho tìm kiếm
   const debouncedSearch = useDebouncedCallback((term: string) => {
     const query = createQueryString({ search: term });
     router.push(`${pathname}?${query}`);
   }, 400);
+
+  // Debounce cho lọc giá
+  const debouncedPriceFilter = useDebouncedCallback((key: string, value: string) => {
+    const numValue = parseFloat(value);
+    // Chỉ áp dụng filter nếu giá trị hợp lệ
+    if (!isNaN(numValue) && numValue >= 0) {
+      const query = createQueryString({ [key]: numValue });
+      router.push(`${pathname}?${query}`);
+    } else if (value === "") {
+      // Nếu người dùng xóa input, xóa filter
+      const query = createQueryString({ [key]: "" });
+      router.push(`${pathname}?${query}`);
+    }
+  }, 600);
 
   const handleFilterChange = (key: string, value: any) => {
     const query = createQueryString({ [key]: value });
@@ -181,26 +196,26 @@ export function ProductFilters({
 
             {/* Price Filter */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Khoảng giá bán</Label>
+              <Label className="text-sm font-medium">Khoảng giá bán (VNĐ)</Label>
               <div className="flex gap-2 items-center">
                 <Input
                   type="number"
                   placeholder="Từ"
                   className="h-9"
+                  min="0"
+                  step="1000"
                   defaultValue={initialFilters.min_price}
-                  onBlur={(e) =>
-                    handleFilterChange("min_price", e.target.value)
-                  }
+                  onChange={(e) => debouncedPriceFilter("min_price", e.target.value)}
                 />
                 <span className="text-muted-foreground">-</span>
                 <Input
                   type="number"
                   placeholder="Đến"
                   className="h-9"
+                  min="0"
+                  step="1000"
                   defaultValue={initialFilters.max_price}
-                  onBlur={(e) =>
-                    handleFilterChange("max_price", e.target.value)
-                  }
+                  onChange={(e) => debouncedPriceFilter("max_price", e.target.value)}
                 />
               </div>
             </div>

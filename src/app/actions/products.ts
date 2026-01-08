@@ -1,43 +1,39 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/supabase-server";
-import { Product, ProductFormData, ProductFilters } from "@/types";
+import {
+  Product,
+  ProductFormData,
+  ProductFilters
+} from "@/types";
 import { revalidatePath } from "next/cache";
 
 /**
- * Lấy thống kê tổng quan về sản phẩm và kho hàng
+ * 1. LẤY THỐNG KÊ TỔNG QUAN (PRODUCT STATS)
+ * Best Practice: Sử dụng reduce để tính toán trong một vòng lặp duy nhất trên Server.
  */
 export async function getProductStats() {
   try {
     const { data: products, error } = await supabaseAdmin
       .from("products")
-      .select("current_stock, min_stock, cost_price, sale_price");
+      .select("current_stock, min_stock, cost_price")
+      .eq("is_active", true);
 
     if (error || !products) {
       return { totalProducts: 0, lowStockProducts: 0, totalInventoryValue: 0 };
     }
 
-    let lowStockCount = 0;
-    let totalValue = 0;
-
-    products.forEach((p) => {
+    return products.reduce((acc, p) => {
       const stock = p.current_stock ?? 0;
       const minStock = p.min_stock ?? 0;
+      const cost = p.cost_price ?? 0;
 
-      if (stock <= minStock) {
-        lowStockCount++;
-      }
+      acc.totalProducts++;
+      if (stock <= minStock) acc.lowStockProducts++;
+      acc.totalInventoryValue += (stock * cost);
 
-      // Ưu tiên giá vốn để tính giá trị kho hàng
-      const price = p.cost_price || 0;
-      totalValue += stock * price;
-    });
-
-    return {
-      totalProducts: products.length,
-      lowStockProducts: lowStockCount,
-      totalInventoryValue: totalValue,
-    };
+      return acc;
+    }, { totalProducts: 0, lowStockProducts: 0, totalInventoryValue: 0 });
   } catch (error) {
     console.error("getProductStats error:", error);
     return { totalProducts: 0, lowStockProducts: 0, totalInventoryValue: 0 };
@@ -45,75 +41,114 @@ export async function getProductStats() {
 }
 
 /**
- * Lấy danh sách sản phẩm kèm phân trang, bộ lọc và các lô hàng liên quan
+ * 2. LẤY DANH SÁCH SẢN PHẨM PHÂN TRANG & LỌC (GET PRODUCTS)
+ * Best Practice: Xử lý search đa cột và filter logic 'Sắp hết hàng'.
  */
 export async function getProducts(filters?: ProductFilters, page: number = 1) {
   try {
-    const pageSize = 10;
-    let query = supabaseAdmin.from("products").select(
-      `
-        *,
-        product_batches (id, batch_number, expiry_date, quantity)
-      `,
-      { count: "exact" }
-    );
+    const pageSize = 5;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
 
-    // Lọc theo tìm kiếm (Mã, Tên, Barcode)
-    if (filters?.search) {
-      const s = `%${filters.search}%`;
-      query = query.or(
-        `name.ilike.${s},internal_code.ilike.${s},barcode.ilike.${s}`
-      );
+    // 1. Khởi tạo Query gốc
+    let query;
+    if (filters?.low_stock === true) {
+      query = supabaseAdmin.rpc("get_low_stock_products", {}, { count: "exact" });
+    } else {
+      query = supabaseAdmin.from("products").select("*", { count: "exact" });
     }
 
-    // Lọc theo danh mục
-    if (filters?.category) {
+    // 2. Lọc Tìm kiếm
+    if (filters?.search?.trim()) {
+      const s = `%${filters.search}%`;
+      query = query.or(`name.ilike.${s},internal_code.ilike.${s},barcode.ilike.${s}`);
+    }
+
+    // 3. Lọc Danh mục
+    if (filters?.category?.trim()) {
       query = query.eq("category", filters.category);
     }
-
-    // Lọc theo trạng thái kinh doanh
+    
+    // 4. Lọc Trạng thái
     if (filters?.is_active !== undefined) {
       query = query.eq("is_active", filters.is_active);
     }
 
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+    // 5. Lọc Giá - THÊM LOGIC PARSE TỪ STRING
+    // Xử lý min_price
+    if (filters?.min_price !== undefined && filters?.min_price !== null) {
+      let minVal: number;
+      
+      // Nếu là string, chuyển đổi thành number
+      if (typeof filters.min_price === 'string') {
+        minVal = parseFloat(filters.min_price);
+      } else {
+        minVal = filters.min_price as number;
+      }
+      
+      if (!isNaN(minVal) && minVal > 0) {
+        query = query.gte("sale_price", minVal);
+      }
+    }
 
-    const { data, error, count } = await query
+    // Xử lý max_price
+    if (filters?.max_price !== undefined && filters?.max_price !== null) {
+      let maxVal: number;
+      
+      // Nếu là string, chuyển đổi thành number
+      if (typeof filters.max_price === 'string') {
+        maxVal = parseFloat(filters.max_price);
+      } else {
+        maxVal = filters.max_price as number;
+      }
+      
+      if (!isNaN(maxVal) && maxVal > 0) {
+        query = query.lte("sale_price", maxVal);
+      }
+    }
+
+    // 6. Thực thi Query
+    const { data: productsData, error, count } = await query
       .range(from, to)
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Query Error:", error);
+      throw error;
+    }
 
-    return {
-      products: data as (Product & { product_batches: any[] })[],
-      totalCount: count || 0,
-    };
-  } catch (error) {
-    console.error("Error fetching products:", error);
+    // --- Logic lấy batches giữ nguyên ---
+    const products = (productsData as Product[]) || [];
+    const productIds = products.map((p: Product) => p.id);
+    
+    let batches: any[] = [];
+    if (productIds.length > 0) {
+      const { data: batchData } = await supabaseAdmin
+        .from("product_batches")
+        .select("*")
+        .in("product_id", productIds);
+      batches = batchData || [];
+    }
+
+    const finalData = products.map((p: Product) => ({
+      ...p,
+      product_batches: batches.filter((b: any) => b.product_id === p.id)
+    }));
+
+    return { products: finalData, totalCount: count || 0 };
+  } catch (error: any) {
+    console.error("Error in getProducts:", error.message);
     return { products: [], totalCount: 0 };
   }
 }
-
 /**
- * Lấy chi tiết 1 sản phẩm kèm theo danh sách các lô hàng (Batches)
+ * 3. LẤY CHI TIẾT 1 SẢN PHẨM (GET BY ID)
  */
 export async function getProductById(id: string) {
   try {
     const { data, error } = await supabaseAdmin
       .from("products")
-      .select(
-        `
-        *,
-        product_batches (
-          id,
-          batch_number,
-          expiry_date,
-          quantity,
-          updated_at
-        )
-      `
-      )
+      .select(`*, product_batches (*)`)
       .eq("id", id)
       .single();
 
@@ -126,35 +161,30 @@ export async function getProductById(id: string) {
 }
 
 /**
- * Thêm mới sản phẩm
+ * 4. THÊM MỚI SẢN PHẨM (CREATE PRODUCT)
+ * Best Practice: Đảm bảo tạo Snapshot tồn kho đi kèm để quản lý lịch sử biến động.
  */
-export async function createProduct(
-  formData: ProductFormData & { manage_by_batch?: boolean }
-) {
+export async function createProduct(formData: ProductFormData & { manage_by_batch?: boolean }) {
   try {
-    // 1. Loại bỏ các trường không thuộc bảng products trong DB
-    // Đặc biệt là loại bỏ product_batches nếu có để tránh lỗi Schema Cache
-    const { product_batches, current_stock, ...insertData } = formData as any;
+    // Sanitize: Loại bỏ các field không thuộc schema bảng products
+    const { current_stock, ...insertData } = formData as any;
 
-    const { data: product, error } = await supabaseAdmin
+    const { data: product, error: pError } = await supabaseAdmin
       .from("products")
-      .insert([
-        {
-          ...insertData,
-          current_stock: 0, // Sản phẩm mới luôn có kho bằng 0 (phải qua phiếu nhập)
-          barcode: insertData.barcode || null,
-          cost_price: insertData.cost_price || 0,
-          sale_price: insertData.sale_price || 0,
-          is_active: insertData.is_active ?? true,
-          manage_by_batch: insertData.manage_by_batch ?? true,
-        },
-      ])
+      .insert([{
+        ...insertData,
+        current_stock: 0, // Luôn khởi tạo bằng 0, tăng qua phiếu nhập kho
+        barcode: insertData.barcode || null,
+        cost_price: insertData.cost_price || 0,
+        sale_price: insertData.sale_price || 0,
+        is_active: insertData.is_active ?? true,
+      }])
       .select()
       .single();
 
-    if (error) throw error;
+    if (pError) throw pError;
 
-    // 2. Khởi tạo snapshot tồn kho cho sản phẩm mới
+    // Khởi tạo dòng tồn kho trong bảng snapshot
     await supabaseAdmin
       .from("inventory_snapshot")
       .insert([{ product_id: product.id, quantity: 0 }]);
@@ -168,22 +198,11 @@ export async function createProduct(
 }
 
 /**
- * Cập nhật thông tin sản phẩm
+ * 5. CẬP NHẬT THÔNG TIN SẢN PHẨM (UPDATE PRODUCT)
  */
-export async function updateProduct(
-  id: string,
-  formData: Partial<ProductFormData>
-) {
+export async function updateProduct(id: string, formData: Partial<ProductFormData>) {
   try {
-    // Loại bỏ các trường cấm cập nhật trực tiếp hoặc không thuộc bảng
-    const {
-      id: _id,
-      current_stock,
-      internal_code,
-      product_batches,
-      created_at,
-      ...updateData
-    } = formData as any;
+    const { id: _id, current_stock, internal_code, created_at, ...updateData } = formData as any;
 
     const { data, error } = await supabaseAdmin
       .from("products")
@@ -207,16 +226,69 @@ export async function updateProduct(
 }
 
 /**
- * Thay đổi trạng thái kinh doanh (Ẩn/Hiện)
+ * 6. BẬT/TẮT TRẠNG THÁI KINH DOANH (TOGGLE STATUS)
  */
-export async function toggleProductStatus(id: string, isActive: boolean) {
+// export async function toggleProductStatus(id: string, isActive: boolean) {
+//   try {
+//     const { error } = await supabaseAdmin
+//       .from("products")
+//       .update({ is_active: isActive, updated_at: new Date().toISOString() })
+//       .eq("id", id);
+
+//     if (error) throw error;
+
+//     revalidatePath("/products");
+//     return { success: true };
+//   } catch (error: any) {
+//     return { success: false, message: error.message };
+//   }
+// }
+// app/actions/products.ts - THÊM HÀM NÀY
+export async function toggleProductStatus(id: string, status: boolean) {
+  console.log("toggleProductStatus called with:", { id, status });
+  
   try {
+    // Thực hiện cập nhật đơn giản
     const { error } = await supabaseAdmin
       .from("products")
-      .update({ is_active: isActive })
+      .update({ 
+        is_active: status, 
+        updated_at: new Date().toISOString() 
+      })
       .eq("id", id);
 
+    if (error) {
+      console.error("Supabase error:", error);
+      return { success: false, message: error.message };
+    }
+
+    console.log("Update successful, revalidating...");
+    revalidatePath("/products");
+    return { success: true };
+  } catch (error: any) {
+    console.error("toggleProductStatus error:", error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * 7. XÓA SẢN PHẨM (DELETE PRODUCT)
+ * Best Practice: Chặn xóa nếu đã có giao dịch kho để bảo vệ báo cáo tài chính.
+ */
+export async function deleteProduct(id: string) {
+  try {
+    const { count } = await supabaseAdmin
+      .from("inventory_transactions")
+      .select("*", { count: "exact", head: true })
+      .eq("product_id", id);
+
+    if (count && count > 0) {
+      throw new Error("Không thể xóa sản phẩm đã phát sinh giao dịch nhập/xuất.");
+    }
+
+    const { error } = await supabaseAdmin.from("products").delete().eq("id", id);
     if (error) throw error;
+
     revalidatePath("/products");
     return { success: true };
   } catch (error: any) {
@@ -225,19 +297,11 @@ export async function toggleProductStatus(id: string, isActive: boolean) {
 }
 
 /**
- * Lấy danh sách các danh mục thuốc (Unique) để dùng cho dropdown lọc
+ * 8. LẤY DANH MỤC SẢN PHẨM (GET CATEGORIES)
+ * Logic: Gộp danh mục mặc định và danh mục thực tế từ DB.
  */
 export async function getProductCategories(): Promise<string[]> {
-  // Danh mục hệ thống luôn có
-  const defaultCategories = [
-    "Thuốc kê đơn",
-    "Thuốc không kê đơn (OTC)",
-    "Thực phẩm chức năng",
-    "Dược mỹ phẩm",
-    "Vật tư y tế",
-    "Hàng tiêu dùng",
-  ];
-
+  const defaultCategories = ["Thuốc kê đơn", "Thuốc không kê đơn (OTC)", "Thực phẩm chức năng", "Vật tư y tế"];
   try {
     const { data, error } = await supabaseAdmin
       .from("products")
@@ -246,44 +310,11 @@ export async function getProductCategories(): Promise<string[]> {
 
     if (error) return defaultCategories;
 
-    // Lấy các danh mục thực tế từ DB
-    const dbCategories = data?.map((i) => i.category as string) || [];
+    const dbCategories = data.map((i) => i.category as string);
+    const combined = Array.from(new Set([...defaultCategories, ...dbCategories]));
 
-    // Gộp lại, xóa trùng sếp theo bảng chữ cái tiếng Việt
-    const allCategories = Array.from(
-      new Set([...defaultCategories, ...dbCategories])
-    );
-    return allCategories.sort((a, b) => a.localeCompare(b, "vi"));
+    return combined.sort((a, b) => a.localeCompare(b, "vi"));
   } catch (error) {
     return defaultCategories;
-  }
-}
-
-/**
- * Xóa sản phẩm (Chỉ nên dùng nếu sản phẩm chưa có giao dịch kho)
- * Nếu đã có giao dịch, nên dùng toggleProductStatus để ẩn thay vì xóa
- */
-export async function deleteProduct(id: string) {
-  try {
-    // Kiểm tra xem đã có lô hàng hoặc giao dịch nào chưa
-    const { count } = await supabaseAdmin
-      .from("inventory_transactions")
-      .select("*", { count: "exact", head: true })
-      .eq("product_id", id);
-
-    if (count && count > 0) {
-      throw new Error("Không thể xóa sản phẩm đã có lịch sử giao dịch kho.");
-    }
-
-    const { error } = await supabaseAdmin
-      .from("products")
-      .delete()
-      .eq("id", id);
-    if (error) throw error;
-
-    revalidatePath("/products");
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, message: error.message };
   }
 }
