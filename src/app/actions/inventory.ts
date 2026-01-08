@@ -324,6 +324,7 @@ export async function createStockEntryAction(data: {
 
     // Làm mới cache để cập nhật giao diện
     revalidatePath("/inventory");
+    revalidatePath("/entries");
     revalidatePath("/inventory/history");
     revalidatePath("/products");
 
