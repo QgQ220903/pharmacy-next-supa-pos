@@ -217,6 +217,7 @@ const onToggle = async (id: string, currentStatus: boolean) => {
           ))}
         </TableBody>
       </Table>
+      
     </div>
   );
 }

@@ -44,9 +44,8 @@ export async function getProductStats() {
  * 2. LẤY DANH SÁCH SẢN PHẨM PHÂN TRANG & LỌC (GET PRODUCTS)
  * Best Practice: Xử lý search đa cột và filter logic 'Sắp hết hàng'.
  */
-export async function getProducts(filters?: ProductFilters, page: number = 1) {
+export async function getProducts(filters?: ProductFilters, page: number = 1, pageSize: number = 10) {
   try {
-    const pageSize = 5;
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 

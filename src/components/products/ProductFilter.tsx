@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback } from "react";
 import { useDebouncedCallback } from "use-debounce";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface ProductFiltersProps {
   categories: string[];
@@ -34,7 +35,7 @@ export function ProductFilters({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
-  
+
   const createQueryString = useCallback(
     (paramsToUpdate: Record<string, any>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -77,6 +78,16 @@ export function ProductFilters({
     router.push(`${pathname}?${query}`);
   };
 
+  const handleStatusChange = (value: string) => {
+    // Quy ước: "all" = tất cả, "active" = đang bán, "inactive" = ngừng bán
+    if (value === "all") {
+      handleFilterChange("is_active", ""); // Xóa filter
+    } else if (value === "active") {
+      handleFilterChange("is_active", "true");
+    } else if (value === "inactive") {
+      handleFilterChange("is_active", "false");
+    }
+  };
   const resetFilters = () => router.push(pathname);
 
   const activeFilterCount = Array.from(searchParams.keys()).filter(
@@ -118,7 +129,7 @@ export function ProductFilters({
               <span className="hidden sm:inline">Sắp hết</span>
             </Button>
 
-            <Button
+            {/* <Button
               variant={
                 initialFilters.is_active === false ? "default" : "outline"
               }
@@ -133,7 +144,26 @@ export function ProductFilters({
             >
               <EyeOff className="h-4 w-4" />
               <span className="hidden sm:inline">Ngừng bán</span>
-            </Button>
+            </Button> */}
+            {/* Bộ chuyển trạng thái mới */}
+            <Tabs
+              // Sửa logic so sánh: kiểm tra true/false thay vì "true"/"false"
+              defaultValue={
+                initialFilters.is_active === true
+                  ? "active"
+                  : initialFilters.is_active === false
+                    ? "inactive"
+                    : "all"
+              }
+              onValueChange={handleStatusChange}
+              className="w-[400px]"
+            >
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="all">Tất cả</TabsTrigger>
+                <TabsTrigger value="active">Đang kinh doanh</TabsTrigger>
+                <TabsTrigger value="inactive">Ngừng bán</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
             <Button
               variant="outline"

@@ -6,78 +6,99 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default async function NewProductPage() {
-  // Lấy danh mục (đã bao gồm mặc định + từ DB trong Server Action)
   const categories = await getProductCategories();
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-      {/* Nút quay lại và Tiêu đề */}
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="icon" asChild className="rounded-full">
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-start gap-4">
+        <Button variant="ghost" size="icon" asChild className="rounded-lg">
           <Link href="/products">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Thêm sản phẩm mới
           </h1>
           <p className="text-sm text-muted-foreground">
-            Thiết lập thông tin thuốc và chế độ quản lý kho cho nhà thuốc
+            Thiết lập thông tin sản phẩm và cấu hình quản lý kho
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* BÊN TRÁI: FORM CHÍNH */}
+        {/* Main Form */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl border shadow-sm p-6">
-            {/* Truyền mảng categories xuống cho ProductForm */}
-            <ProductForm categories={categories} />
-          </div>
+          <Card className="border bg-card shadow-sm">
+            <CardContent className="p-6">
+              <ProductForm categories={categories} />
+            </CardContent>
+          </Card>
         </div>
 
-        {/* BÊN PHẢI: HƯỚNG DẪN & LƯU Ý */}
+        {/* Sidebar - Guides */}
         <div className="space-y-6">
-          <Card className="border-purple-100 bg-purple-50/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2 text-purple-700">
-                <Layers className="h-5 w-5" /> Chế độ quản lý
+          {/* Management Mode Card */}
+          <Card className="border bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-violet-100 dark:bg-violet-900/30">
+                  <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                </div>
+                Chế độ quản lý
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-[13px] text-purple-900/80 space-y-3 leading-relaxed">
-              <div className="bg-white/50 p-3 rounded-lg border border-purple-100">
-                <p className="font-bold text-purple-800 mb-1">
-                  📌 Quản lý theo lô:
-                </p>
-                <p>
-                  Dành cho thuốc có hạn dùng cụ thể. Giúp theo dõi lô hết hạn
-                  trước (FEFO) để xuất bán trước.
-                </p>
+            <CardContent className="space-y-4 text-sm">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <div className="h-2 w-2 rounded-full bg-violet-500 mt-1.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Quản lý theo lô</p>
+                    <p className="text-muted-foreground text-xs">
+                      Theo dõi hạn dùng từng đợt nhập (FEFO)
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="bg-white/50 p-3 rounded-lg border border-purple-100">
-                <p className="font-bold text-purple-800 mb-1">
-                  📌 Quản lý tổng hợp:
-                </p>
-                <p>
-                  Dành cho bông, băng, gạc, xi lanh... không cần theo dõi hạn
-                  dùng từng đợt nhập.
-                </p>
+              
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Quản lý tổng hợp</p>
+                    <p className="text-muted-foreground text-xs">
+                      Không cần theo dõi hạn dùng từng lô
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-blue-100 bg-blue-50/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2 text-blue-700">
-                <Info className="h-5 w-5" /> Mẹo nhập liệu
+          {/* Tips Card */}
+          <Card className="border bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-900/30">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                Mẹo nhập liệu
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-[13px] text-blue-900/80 space-y-2 italic">
-              <p>
-                • Sử dụng Barcode có sẵn trên hộp thuốc để quét bán hàng nhanh.
-              </p>
-              <p>• Danh mục sẽ tự động ghi nhớ nếu bạn nhập một nhóm mới.</p>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-start gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground mt-1 flex-shrink-0" />
+                <p className="text-muted-foreground">
+                  Có thể nhập tay mã sản phẩm hoặc bấm tạo mã tự động
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground mt-1 flex-shrink-0" />
+                <p className="text-muted-foreground">
+                  Danh mục sẽ tự động ghi nhớ khi nhập mới
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>

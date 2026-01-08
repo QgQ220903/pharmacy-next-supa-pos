@@ -116,6 +116,7 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
           </div>
         )}
       </div>
+
     </div>
   );
 }
