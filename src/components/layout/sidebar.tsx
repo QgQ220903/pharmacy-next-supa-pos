@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
+import LogoutButton from "../auth/LogoutButton";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -243,53 +244,9 @@ export default function Sidebar() {
         </div>
 
         <Separator />
+        
+              <LogoutButton />
 
-        {/* User Profile */}
-        <div className="p-4">
-          <div
-            className={cn(
-              "flex items-center gap-3 rounded-lg p-3 transition-colors hover:bg-accent",
-              collapsed && "justify-center"
-            )}
-          >
-            <div className="relative">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border">
-                <span className="text-sm font-bold bg-gradient-to-br from-primary to-primary/80 bg-clip-text text-transparent">
-                  AD
-                </span>
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-green-500" />
-            </div>
-
-            {!collapsed && (
-              <div className="flex-1 overflow-hidden min-w-0">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold truncate">Admin User</p>
-                  <Badge variant="outline" className="text-xs">
-                    Pro
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  admin@medpos.com
-                </p>
-              </div>
-            )}
-          </div>
-
-          {!collapsed && (
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <Button variant="outline" size="sm" className="text-xs">
-                Hồ sơ
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs">
-                Cài đặt
-              </Button>
-              <Button variant="outline" size="sm" className="text-xs">
-                Đăng xuất
-              </Button>
-            </div>
-          )}
-        </div>
       </div>
     </TooltipProvider>
   );
