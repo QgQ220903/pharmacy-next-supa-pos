@@ -1,5 +1,6 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useReactToPrint } from "react-to-print";
 import {
   ShoppingCart,
   Trash2,
@@ -49,6 +50,16 @@ export default function POSForm({ products }: { products: any[] }) {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 1. Khai báo Ref và State dành cho in ấn
+  const printRef = useRef<HTMLDivElement>(null);
+  const [lastSale, setLastSale] = useState<any>(null);
+
+  // 2. Thiết lập hàm kích hoạt in
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    onAfterPrint: () => setLastSale(null), // Xóa dữ liệu sau khi in xong
+  });
 
   // Filter products based on search
   const filteredProducts = useMemo(() => {
@@ -174,9 +185,21 @@ export default function POSForm({ products }: { products: any[] }) {
 
     if (res.success) {
       toast.success(`Hóa đơn ${res.saleCode} hoàn tất!`);
+      // Gán dữ liệu vào state in trước khi xóa giỏ hàng
+      setLastSale({
+        saleCode: res.saleCode,
+        items: [...cart],
+        totalAmount,
+        discount,
+        finalAmount,
+      });
       setCart([]);
       setCustomer({ name: "", phone: "" });
       setDiscount(0);
+      // Tự động bật hộp thoại in sau 0.5 giây
+      setTimeout(() => {
+        handlePrint();
+      }, 500);
     } else {
       toast.error(res.message);
     }
@@ -483,6 +506,92 @@ export default function POSForm({ products }: { products: any[] }) {
           </CardContent>
         </Card>
       </div>
+      {/* 4. CHÈN COMPONENT IN VÀO CUỐI JSX */}
+      <PrintInvoice ref={printRef} data={lastSale} />
     </div>
   );
 }
+
+const PrintInvoice = React.forwardRef(({ data }: { data: any }, ref: any) => {
+  if (!data) return null;
+
+  return (
+    <div style={{ display: "none" }}>
+      {" "}
+      {/* Ẩn template này trên giao diện web */}
+      <div ref={ref} className="print-area">
+        <div className="text-center font-mono">
+          <h2 className="text-[16px] font-bold uppercase">NHÀ THUỐC CỦA BẠN</h2>
+          <p className="text-[11px]">Đ/C: 123 Đường Số 1, Quận 10, TP.HCM</p>
+          <p className="text-[11px]">SĐT: 0900.000.000</p>
+          <div className="border-b border-dashed border-black my-2" />
+          <h3 className="text-[14px] font-bold">HÓA ĐƠN BÁN LẺ</h3>
+          <p className="text-[11px]">Mã đơn: {data.saleCode}</p>
+          <p className="text-[11px]">
+            Ngày: {new Date().toLocaleString("vi-VN")}
+          </p>
+        </div>
+
+        <table className="w-full text-[11px] font-mono mt-4 border-collapse">
+          <thead>
+            <tr className="border-b border-black">
+              <th className="text-left py-1">Tên hàng</th>
+              <th className="text-center py-1">SL</th>
+              <th className="text-right py-1">Tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((item: any, idx: number) => (
+              <tr key={idx} className="border-b border-dotted border-gray-400">
+                <td className="py-1 leading-tight">{item.name}</td>
+                <td className="text-center py-1">{item.quantity}</td>
+                <td className="text-right py-1">
+                  {(item.sale_price * item.quantity).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="mt-4 text-[11px] font-mono space-y-1">
+          <div className="flex justify-between">
+            <span>Tạm tính:</span>
+            <span>{data.totalAmount.toLocaleString()}đ</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Giảm giá:</span>
+            <span>{data.discount.toLocaleString()}đ</span>
+          </div>
+          <div className="flex justify-between font-bold text-[13px] border-t border-dashed border-black pt-1">
+            <span>THANH TOÁN:</span>
+            <span>{data.finalAmount.toLocaleString()}đ</span>
+          </div>
+        </div>
+
+        <div className="text-center mt-6 text-[10px] italic font-mono">
+          <p>Cảm ơn quý khách. Hẹn gặp lại!</p>
+        </div>
+
+        {/* CSS chuyên dụng cho máy in nhiệt */}
+        <style jsx>{`
+          .print-area {
+            width: 72mm; /* Khổ giấy thực tế sau khi trừ lề máy in */
+            padding: 0;
+            color: #000;
+            background: #fff;
+          }
+          @media print {
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+            }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+});
+PrintInvoice.displayName = "PrintInvoice";
