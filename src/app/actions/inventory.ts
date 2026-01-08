@@ -327,6 +327,7 @@ export async function createStockEntryAction(data: {
     revalidatePath("/entries");
     revalidatePath("/inventory/history");
     revalidatePath("/products");
+    revalidatePath("/sales");
 
     return { success: true, entryCode: entry.entry_code };
   } catch (error: any) {
