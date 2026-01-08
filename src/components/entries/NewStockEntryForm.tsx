@@ -19,15 +19,18 @@ import {
   Trash2,
   Save,
   ArrowLeft,
-  Info,
   Layers,
   Package,
   Truck,
   FileText,
+  Calculator,
 } from "lucide-react";
 import { createStockEntryAction } from "@/app/actions/inventory";
 import { toast } from "sonner";
 import { Product } from "@/types";
+import { Separator } from "@/components/ui/separator";
+import { formatPrice } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 export default function NewStockEntryForm({
   products = [],
@@ -73,12 +76,10 @@ export default function NewStockEntryForm({
   );
 
   const handleSave = async () => {
-    // Kiểm tra thông tin chung
     if (!supplier.trim()) return toast.error("Vui lòng nhập tên Nhà cung cấp");
     if (items.length === 0)
       return toast.error("Vui lòng thêm ít nhất 1 sản phẩm");
 
-    // Kiểm tra dữ liệu từng dòng hàng (Validation)
     for (const item of items) {
       if (item.quantity <= 0) {
         return toast.error(`Sản phẩm "${item.name}" có số lượng không hợp lệ`);
@@ -99,8 +100,8 @@ export default function NewStockEntryForm({
         notes,
         total_amount: totalAmount,
         items,
-        entry_code: `PN${Date.now().toString().slice(-8)}`, // Thêm vào đây
-        entry_date: new Date().toISOString(), // Thêm vào đây
+        entry_code: `PN${Date.now().toString().slice(-8)}`,
+        entry_date: new Date().toISOString(),
       });
       if (result.success) {
         toast.success("Đã nhập kho thành công");
@@ -117,160 +118,184 @@ export default function NewStockEntryForm({
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto p-4 space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background p-4 rounded-lg border shadow-sm sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Quay lại
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 uppercase tracking-tight">
-              Lập phiếu nhập hàng
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Tạo phiếu nhập
             </h1>
-            <p className="text-xs text-slate-500 italic">
-              Tạo phiếu nhập kho và cập nhật tồn kho hệ thống
+            <p className="text-sm text-muted-foreground">
+              Thêm sản phẩm và cập nhật tồn kho
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-right hidden md:block mr-4">
-            <p className="text-[10px] uppercase text-slate-500 font-bold">
-              Tổng cộng tiền hàng
-            </p>
-            <p className="text-lg font-black text-blue-600">
-              {totalAmount.toLocaleString()}đ
-            </p>
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground">Tổng tiền hàng</div>
+            <div className="text-xl font-bold">{formatPrice(totalAmount)}</div>
           </div>
-          <Button
-            onClick={handleSave}
-            disabled={loading}
-            className="bg-green-600 hover:bg-green-700 shadow-md h-11 px-6"
-          >
-            <Save className="mr-2 h-5 w-5" />
-            {loading ? "Đang xử lý..." : "Hoàn tất & Nhập kho"}
+          <Button onClick={handleSave} disabled={loading} size="sm">
+            <Save className="h-4 w-4 mr-2" />
+            {loading ? "Đang xử lý..." : "Hoàn tất"}
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Cột trái: Thông tin chung */}
+        {/* Left Column - Information */}
         <div className="lg:col-span-4 space-y-6">
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 border-b py-3">
-              <CardTitle className="text-sm font-bold flex items-center gap-2 uppercase">
-                <Truck className="h-4 w-4 text-blue-600" /> Thông tin đối tác
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-900/30">
+                  <Truck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                Thông tin đối tác
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label
-                  htmlFor="supplier"
-                  className="text-xs font-semibold uppercase text-slate-600"
-                >
-                  Nhà cung cấp <span className="text-red-500">*</span>
+                <Label htmlFor="supplier">
+                  Nhà cung cấp <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="supplier"
-                  placeholder="VD: Công ty Dược phẩm Tuệ Linh..."
+                  placeholder="Nhập tên nhà cung cấp..."
                   value={supplier}
                   onChange={(e) => setSupplier(e.target.value)}
-                  className="focus-visible:ring-blue-500 h-10"
                 />
               </div>
               <div className="space-y-2">
-                <Label
-                  htmlFor="notes"
-                  className="text-xs font-semibold uppercase text-slate-600"
-                >
-                  Ghi chú phiếu nhập
-                </Label>
+                <Label htmlFor="notes">Ghi chú phiếu nhập</Label>
                 <Textarea
                   id="notes"
-                  placeholder="Ghi chú thêm về đơn hàng, số hóa đơn..."
+                  placeholder="Ghi chú thêm về đơn hàng..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="min-h-[100px] resize-none focus-visible:ring-blue-500"
+                  className="min-h-[100px]"
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Stats Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-violet-100 dark:bg-violet-900/30">
+                  <Calculator className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                </div>
+                Thống kê
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Tổng sản phẩm
+                </span>
+                <span className="font-semibold">{items.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Tổng số lượng
+                </span>
+                <span className="font-semibold">
+                  {items.reduce((sum, item) => sum + item.quantity, 0)}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-sm text-muted-foreground">
+                  Tổng tiền hàng
+                </span>
+                <span className="text-lg font-bold">
+                  {formatPrice(totalAmount)}
+                </span>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Cột phải: Danh sách hàng hóa */}
+        {/* Right Column - Products */}
         <div className="lg:col-span-8 space-y-6">
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 border-b py-3">
-              <CardTitle className="text-sm font-bold flex items-center gap-2 uppercase">
-                <FileText className="h-4 w-4 text-blue-600" /> Chi tiết hàng hóa
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
+                  <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                Chi tiết hàng hóa
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="p-4 bg-white border-b">
-                <ProductSearch products={products} onSelect={addItem} />
-              </div>
+            <CardContent className="space-y-4">
+              <ProductSearch products={products} onSelect={addItem} />
 
-              <div className="relative overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50/30">
-                      <TableHead className="w-[35%]">Sản phẩm</TableHead>
-                      <TableHead className="min-w-[200px]">
-                        Thông tin Lô
-                      </TableHead>
-                      <TableHead className="w-[100px] text-center">
-                        SL
-                      </TableHead>
-                      <TableHead className="w-[140px] text-right">
-                        Thành tiền
-                      </TableHead>
-                      <TableHead className="w-[40px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.length === 0 ? (
+              {items.length === 0 ? (
+                <div className="py-12 text-center space-y-4 border-2 border-dashed rounded-lg bg-muted/30">
+                  <Package className="h-12 w-12 text-muted-foreground/50 mx-auto" />
+                  <div className="space-y-2">
+                    <p className="font-medium">Chưa có sản phẩm</p>
+                    <p className="text-sm text-muted-foreground">
+                      Tìm kiếm và thêm sản phẩm để bắt đầu
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell
-                          colSpan={5}
-                          className="h-32 text-center text-slate-400 italic"
-                        >
-                          Chưa có sản phẩm nào được chọn. Hãy tìm kiếm ở trên.
-                        </TableCell>
+                        <TableHead className="w-[35%]">Sản phẩm</TableHead>
+                        <TableHead>Thông tin Lô</TableHead>
+                        <TableHead className="text-center">Số lượng</TableHead>
+                        <TableHead className="text-right">Thành tiền</TableHead>
+                        <TableHead className="w-[40px]"></TableHead>
                       </TableRow>
-                    ) : (
-                      items.map((item, idx) => (
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((item, idx) => (
                         <TableRow
                           key={item.product_id}
-                          className="hover:bg-slate-50/50 transition-colors"
+                          className="hover:bg-muted/30"
                         >
-                          <TableCell className="align-top py-4">
+                          <TableCell>
                             <div className="space-y-1">
-                              <p className="font-bold text-slate-900 leading-tight">
-                                {item.name}
-                              </p>
+                              <div className="font-medium">{item.name}</div>
                               <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border">
+                                <Badge variant="outline" className="text-xs">
                                   {item.unit}
-                                </span>
+                                </Badge>
                                 {item.manage_by_batch ? (
-                                  <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1">
-                                    <Layers size={10} /> THEO LÔ
-                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs bg-violet-100 text-violet-800 border-violet-200"
+                                  >
+                                    <Layers className="h-3 w-3 mr-1" />
+                                    Theo lô
+                                  </Badge>
                                 ) : (
-                                  <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 flex items-center gap-1">
-                                    <Package size={10} /> HÀNG TỔNG
-                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs bg-blue-100 text-blue-800 border-blue-200"
+                                  >
+                                    <Package className="h-3 w-3 mr-1" />
+                                    Tổng hợp
+                                  </Badge>
                                 )}
                               </div>
                             </div>
                           </TableCell>
 
-                          <TableCell className="align-top py-4">
+                          <TableCell>
                             {item.manage_by_batch ? (
-                              <div className="grid gap-2">
+                              <div className="space-y-2">
                                 <Input
                                   placeholder="Số lô hàng"
-                                  className="h-8 text-[11px] border-slate-200 focus:border-blue-400"
                                   value={item.batch_number}
                                   onChange={(e) =>
                                     updateItem(
@@ -279,14 +304,12 @@ export default function NewStockEntryForm({
                                       e.target.value
                                     )
                                   }
+                                  className="h-8 text-sm"
                                 />
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-[10px] text-slate-500 font-medium">
-                                    Hạn dùng:
-                                  </span>
+                                <div className="space-y-1">
+                                  <Label className="text-xs">Hạn dùng</Label>
                                   <Input
                                     type="date"
-                                    className="h-8 text-[11px] border-slate-200"
                                     value={item.expiry_date}
                                     onChange={(e) =>
                                       updateItem(
@@ -295,21 +318,21 @@ export default function NewStockEntryForm({
                                         e.target.value
                                       )
                                     }
+                                    className="h-8 text-sm"
                                   />
                                 </div>
                               </div>
                             ) : (
-                              <div className="h-20 flex items-center justify-center text-[10px] text-slate-400 italic bg-slate-50/50 border border-dashed rounded-md px-4 text-center">
+                              <div className="text-sm text-muted-foreground italic">
                                 Không cần thông tin lô
                               </div>
                             )}
                           </TableCell>
 
-                          <TableCell className="align-top py-4">
-                            <div className="space-y-3">
+                          <TableCell>
+                            <div className="space-y-2">
                               <Input
                                 type="number"
-                                className="text-center h-8 font-bold border-slate-300"
                                 value={item.quantity}
                                 onChange={(e) =>
                                   updateItem(
@@ -318,14 +341,13 @@ export default function NewStockEntryForm({
                                     Number(e.target.value)
                                   )
                                 }
+                                className="h-8 text-center"
+                                min="1"
                               />
-                              <div className="text-right">
-                                <span className="text-[10px] text-slate-400 block">
-                                  Đơn giá:
-                                </span>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Đơn giá</Label>
                                 <Input
                                   type="number"
-                                  className="text-right h-8 text-xs border-transparent bg-slate-50 focus:bg-white"
                                   value={item.unit_price}
                                   onChange={(e) =>
                                     updateItem(
@@ -334,25 +356,22 @@ export default function NewStockEntryForm({
                                       Number(e.target.value)
                                     )
                                   }
+                                  className="h-8"
+                                  min="0"
                                 />
                               </div>
                             </div>
                           </TableCell>
 
-                          <TableCell className="align-top py-4 text-right">
-                            <p className="font-black text-slate-800 text-sm mt-1">
-                              {(
-                                item.quantity * item.unit_price
-                              ).toLocaleString()}
-                              đ
-                            </p>
+                          <TableCell className="text-right font-semibold">
+                            {formatPrice(item.quantity * item.unit_price)}
                           </TableCell>
 
-                          <TableCell className="align-top py-3">
+                          <TableCell>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-slate-300 hover:text-red-500 hover:bg-red-50"
+                              className="h-8 w-8"
                               onClick={() =>
                                 setItems(items.filter((_, i) => i !== idx))
                               }
@@ -361,11 +380,11 @@ export default function NewStockEntryForm({
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -15,7 +15,7 @@ export async function getInventoryHistoryAction(params: {
   try {
     const {
       page = 1,
-      limit = 15,
+      limit = 10,
       productId,
       productQuery,
       fromDate,
@@ -389,5 +389,47 @@ export async function getTransactionDetailAction(
   } catch (error: any) {
     console.error("Lỗi chi tiết kho:", error);
     return { success: false, message: error.message };
+  }
+}
+
+// app/actions/inventory.ts
+
+export async function getProductInventoryCard(productId: string) {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("inventory_transactions")
+      .select(
+        `
+        id,
+        transaction_type,
+        quantity_change,
+        reference_id,
+        notes,
+        created_at
+      `
+      )
+      .eq("product_id", productId)
+      .order("created_at", { ascending: true }); // Sắp xếp cũ trước mới sau để tính tồn lũy kế
+
+    if (error) throw error;
+
+    // Tính toán số dư lũy kế (Running Balance)
+    let runningBalance = 0;
+    const historyWithBalance = data.map((item) => {
+      runningBalance += item.quantity_change;
+      return {
+        ...item,
+        balance_after: runningBalance,
+      };
+    });
+
+    // Trả về danh sách đã đảo ngược (mới nhất lên đầu) để hiển thị bảng
+    return {
+      success: true,
+      data: historyWithBalance.reverse(),
+    };
+  } catch (error: any) {
+    console.error("Error fetching product inventory card:", error);
+    return { success: false, data: [] };
   }
 }

@@ -2,10 +2,9 @@ import { supabaseAdmin } from "@/lib/supabase-server";
 import EntryListClient from "@/components/entries/EntryListClient";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Plus, Download } from "lucide-react";
+import { Plus, Download, Package2 } from "lucide-react";
 
 export default async function EntriesPage() {
-  // Lấy danh sách phiếu nhập kèm theo chi tiết sản phẩm
   const { data: entries, error } = await supabaseAdmin
     .from("stock_entries")
     .select(
@@ -24,32 +23,69 @@ export default async function EntriesPage() {
     )
     .order("created_at", { ascending: false });
 
-  if (error) return <div>Lỗi tải dữ liệu: {error.message}</div>;
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Lịch sử nhập hàng
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Quản lý các hóa đơn nhập kho và lô hàng.
+  if (error) {
+    return (
+      <div className="container mx-auto py-10">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center animate-in fade-in duration-500">
+          <p className="text-destructive font-medium">
+            Lỗi tải dữ liệu: {error.message}
           </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" /> Xuất Excel
-          </Button>
-          <Button asChild className="bg-blue-600 hover:bg-blue-700">
-            <Link href="/entries/new">
-              <Plus className="mr-2 h-4 w-4" /> Nhập hàng mới
-            </Link>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => window.location.reload()}
+          >
+            Thử lại
           </Button>
         </div>
       </div>
+    );
+  }
 
-      <EntryListClient initialEntries={entries || []} />
+  return (
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
+      <div className="container mx-auto py-8 space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b pb-6 border-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Package2 className="h-6 w-6 text-primary" />
+            </div>
+            <div className="space-y-0.5">
+              <h1 className="text-3xl font-bold tracking-tight">Nhập hàng</h1>
+              <p className="text-sm text-muted-foreground">
+                Quản lý phiếu nhập kho và lô hàng chi tiết
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden sm:flex hover:bg-accent transition-colors"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Xuất Excel
+            </Button>
+            <Button
+              size="sm"
+              asChild
+              className="shadow-md hover:shadow-lg transition-all active:scale-95"
+            >
+              <Link href="/entries/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Nhập hàng mới
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="rounded-xl text-card-foreground overflow-hidden border-border/50">
+          <EntryListClient initialEntries={entries || []} />
+        </div>
+      </div>
     </div>
   );
 }

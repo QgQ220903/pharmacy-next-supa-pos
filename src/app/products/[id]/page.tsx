@@ -30,15 +30,13 @@ import { Separator } from "@/components/ui/separator";
 export default async function ProductDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>; // Khai báo dạng Promise cho Next.js 15+
+  params: Promise<{ id: string }>;
 }) {
-  // Giải nén params
   const { id } = await params;
   const product = await getProductById(id);
 
   if (!product) notFound();
 
-  // Tính toán lợi nhuận dự kiến
   const profit = product.sale_price - (product.cost_price || 0);
   const profitMargin =
     product.sale_price > 0
@@ -46,147 +44,156 @@ export default async function ProductDetailPage({
       : 0;
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
+    <div className="container mx-auto py-8 space-y-8">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild className="rounded-lg">
             <Link href="/products">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-slate-900">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                 {product.name}
               </h1>
               {!product.is_active && (
-                <Badge variant="destructive">Ngừng kinh doanh</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  Ngừng kinh doanh
+                </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground font-mono">
-              Mã: {product.internal_code}{" "}
-              {product.barcode ? `| Barcode: ${product.barcode}` : ""}
+            <p className="text-sm text-muted-foreground">
+              Mã: {product.internal_code}
+              {product.barcode && ` • Barcode: ${product.barcode}`}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/inventory-history/${id}`}>
-              <History className="h-4 w-4 mr-2" /> Thẻ kho
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/inventory/history/${id}`}>
+              <History className="h-4 w-4 mr-2" />
+              Thẻ kho
             </Link>
           </Button>
-          <Button asChild>
+          <Button size="sm" asChild>
             <Link href={`/products/${id}/edit`}>
-              <Edit className="h-4 w-4 mr-2" /> Chỉnh sửa
+              <Edit className="h-4 w-4 mr-2" />
+              Chỉnh sửa
             </Link>
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* CỘT TRÁI: THÔNG TIN CHI TIẾT */}
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Info className="h-5 w-5 text-blue-500" /> Thông tin cơ bản
+          {/* Basic Information Card */}
+          <Card className="border bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-900/30">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                Thông tin cơ bản
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Đơn vị
-                </p>
-                <p className="font-semibold text-slate-700 text-lg">
-                  {product.unit}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Danh mục
-                </p>
-                <p className="mt-1">
-                  <Badge
-                    variant="secondary"
-                    className="bg-blue-50 text-blue-700 border-blue-100"
-                  >
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Đơn vị
+                  </p>
+                  <p className="font-semibold">{product.unit}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Danh mục
+                  </p>
+                  <Badge variant="secondary" className="font-normal">
                     {product.category || "Chưa phân loại"}
                   </Badge>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Kiểu quản lý
-                </p>
-                <div className="flex items-center gap-1 mt-1">
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Kiểu quản lý
+                  </p>
                   {product.manage_by_batch ? (
-                    <Badge className="bg-purple-100 text-purple-700 border-purple-200">
-                      <Layers className="h-3 w-3 mr-1" /> Theo lô hàng
+                    <Badge variant="outline" className="border-violet-200">
+                      <Layers className="h-3 w-3 mr-1 text-violet-600" />
+                      Theo lô hàng
                     </Badge>
                   ) : (
-                    <Badge className="bg-slate-100 text-slate-700">
-                      <Box className="h-3 w-3 mr-1" /> Tổng hợp
+                    <Badge variant="outline" className="border-blue-200">
+                      <Box className="h-3 w-3 mr-1 text-blue-600" />
+                      Tổng hợp
                     </Badge>
                   )}
                 </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Ngày tạo
+                  </p>
+                  <p className="text-sm">{formatDate(product.created_at)}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">
-                  Ngày tạo
-                </p>
-                <p className="text-sm text-slate-600 mt-1">
-                  {formatDate(product.created_at)}
-                </p>
-              </div>
+
+              {product.notes && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Ghi chú / Công dụng
+                    </p>
+                    <div className="p-3 rounded-lg bg-muted/30 text-sm">
+                      {product.notes}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
-            {product.notes && (
-              <CardContent className="pt-0">
-                <Separator className="mb-4" />
-                <p className="text-xs font-bold text-slate-400 uppercase mb-2">
-                  Ghi chú / Công dụng
-                </p>
-                <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-dashed">
-                  {product.notes}
-                </p>
-              </CardContent>
-            )}
           </Card>
 
-          {/* HIỂN THỊ THEO LÔ HOẶC THEO TỔNG HỢP */}
-          <Card>
-            <CardHeader className="border-b bg-slate-50/30">
-              <CardTitle className="text-lg flex items-center gap-2">
-                {product.manage_by_batch ? (
-                  <>
-                    <Layers className="h-5 w-5 text-purple-600" /> Tồn kho chi
-                    tiết theo lô
-                  </>
-                ) : (
-                  <>
-                    <History className="h-5 w-5 text-blue-600" /> Lịch sử biến
-                    động
-                  </>
-                )}
+          {/* Inventory Details Card */}
+          <Card className="border bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <div
+                  className={cn(
+                    "p-1.5 rounded-md",
+                    product.manage_by_batch
+                      ? "bg-violet-100 dark:bg-violet-900/30"
+                      : "bg-blue-100 dark:bg-blue-900/30"
+                  )}
+                >
+                  {product.manage_by_batch ? (
+                    <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                  ) : (
+                    <History className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  )}
+                </div>
+                {product.manage_by_batch
+                  ? "Tồn kho theo lô"
+                  : "Quản lý tổng hợp"}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {product.manage_by_batch ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50/50">
-                      <TableHead className="pl-6">Số lô (Batch No.)</TableHead>
-                      <TableHead>Hạn sử dụng</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead className="text-right pr-6">
-                        Số lượng tồn
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {product.product_batches &&
-                    product.product_batches.length > 0 ? (
-                      product.product_batches.map((batch: any) => {
+                product.product_batches?.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-6">Số lô</TableHead>
+                        <TableHead>Hạn sử dụng</TableHead>
+                        <TableHead>Trạng thái</TableHead>
+                        <TableHead className="text-right pr-6">
+                          Tồn kho
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {product.product_batches.map((batch: any) => {
                         const isExpired =
                           new Date(batch.expiry_date) < new Date();
                         const isNearExpiry =
@@ -197,91 +204,73 @@ export default async function ProductDetailPage({
                         return (
                           <TableRow
                             key={batch.id}
-                            className="hover:bg-slate-50/50 transition-colors"
+                            className="hover:bg-muted/30"
                           >
-                            <TableCell className="font-mono font-bold text-slate-700 pl-6">
+                            <TableCell className="font-medium font-mono">
                               {batch.batch_number}
                             </TableCell>
                             <TableCell
                               className={cn(
                                 "font-medium",
-                                isExpired
-                                  ? "text-red-600"
-                                  : isNearExpiry
-                                  ? "text-amber-600"
-                                  : "text-slate-600"
+                                isExpired && "text-destructive",
+                                isNearExpiry && "text-amber-600"
                               )}
                             >
                               {formatDate(batch.expiry_date)}
                             </TableCell>
                             <TableCell>
-                              {isExpired ? (
-                                <Badge
-                                  variant="destructive"
-                                  className="text-[10px]"
-                                >
-                                  Hết hạn
-                                </Badge>
-                              ) : isNearExpiry ? (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] border-amber-200 text-amber-700 bg-amber-50"
-                                >
-                                  Sắp hết hạn
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] border-green-200 text-green-700 bg-green-50"
-                                >
-                                  An toàn
-                                </Badge>
-                              )}
+                              <Badge
+                                variant={
+                                  isExpired
+                                    ? "destructive"
+                                    : isNearExpiry
+                                    ? "outline"
+                                    : "secondary"
+                                }
+                                className="text-xs"
+                              >
+                                {isExpired
+                                  ? "Hết hạn"
+                                  : isNearExpiry
+                                  ? "Sắp hết hạn"
+                                  : "An toàn"}
+                              </Badge>
                             </TableCell>
-                            <TableCell className="text-right font-bold text-blue-600 pr-6">
+                            <TableCell className="text-right font-semibold">
                               {batch.quantity}{" "}
-                              <span className="text-[10px] text-slate-400 font-normal">
+                              <span className="text-muted-foreground text-xs">
                                 {product.unit}
                               </span>
                             </TableCell>
                           </TableRow>
                         );
-                      })
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-12">
-                          <div className="flex flex-col items-center text-slate-400">
-                            <Package className="h-10 w-10 mb-2 opacity-20" />
-                            <p className="italic text-sm">
-                              Chưa có thông tin lô hàng. Vui lòng tạo phiếu nhập
-                              kho.
-                            </p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="p-12 text-center space-y-4">
-                  <div className="inline-flex p-4 rounded-full bg-blue-50">
-                    <Box className="h-8 w-8 text-blue-500" />
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="py-12 text-center space-y-4">
+                    <Package className="h-12 w-12 text-muted-foreground/50 mx-auto" />
+                    <div>
+                      <p className="font-medium">Chưa có thông tin lô hàng</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Tạo phiếu nhập kho để thêm lô hàng
+                      </p>
+                    </div>
                   </div>
-                  <div className="max-w-xs mx-auto">
-                    <p className="font-semibold text-slate-700">
-                      Sản phẩm quản lý tổng hợp
+                )
+              ) : (
+                <div className="py-8 text-center space-y-4">
+                  <div className="inline-flex p-3 rounded-lg bg-muted">
+                    <Box className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-2 max-w-sm mx-auto">
+                    <p className="font-medium">Quản lý tổng hợp</p>
+                    <p className="text-sm text-muted-foreground">
+                      Hệ thống quản lý tồn kho tổng hợp không theo dõi hạn sử
+                      dụng từng lô
                     </p>
-                    <p className="text-sm text-slate-500 mt-1">
-                      Hệ thống không theo dõi hạn sử dụng riêng lẻ cho sản phẩm
-                      này. Tổng tồn kho được cập nhật dựa trên giao dịch
-                      xuất/nhập.
-                    </p>
-                    <Button
-                      variant="link"
-                      className="mt-2 text-blue-600"
-                      asChild
-                    >
-                      <Link href={`/inventory-history/${id}`}>
+                    <Button variant="link" size="sm" asChild className="mt-2">
+                      <Link href={`/inventory/history/${id}`}>
                         Xem thẻ kho chi tiết
                       </Link>
                     </Button>
@@ -292,53 +281,47 @@ export default async function ProductDetailPage({
           </Card>
         </div>
 
-        {/* CỘT PHẢI: KHO & GIÁ */}
+        {/* Right Column */}
         <div className="space-y-6">
-          {/* CARD TỒN KHO */}
-          <Card
-            className={cn(
-              "border-2",
-              product.current_stock <= product.min_stock
-                ? "border-red-200 bg-red-50/30"
-                : "border-primary/10 bg-primary/5"
-            )}
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-widest text-slate-500 flex justify-between items-center">
-                Tổng tồn thực tế
+          {/* Inventory Card */}
+          <Card className="border bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Tồn kho
+                </CardTitle>
                 {product.current_stock <= product.min_stock && (
-                  <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
                 )}
-              </CardTitle>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-end">
-                <h2
+            <CardContent className="space-y-4">
+              <div className="flex items-baseline gap-2">
+                <span
                   className={cn(
-                    "text-5xl font-black tracking-tighter",
-                    product.current_stock <= product.min_stock
-                      ? "text-red-600"
-                      : "text-slate-900"
+                    "text-3xl font-bold",
+                    product.current_stock <= product.min_stock &&
+                      "text-destructive"
                   )}
                 >
                   {product.current_stock}
-                </h2>
-                <span className="text-slate-500 font-bold mb-1 ml-2 uppercase text-sm">
+                </span>
+                <span className="text-sm text-muted-foreground font-medium">
                   {product.unit}
                 </span>
               </div>
 
-              <div className="mt-4 space-y-2 text-sm border-t border-dashed pt-4">
-                <div className="flex justify-between text-slate-500">
-                  <span>Định mức tối thiểu:</span>
-                  <span className="font-bold">
+              <div className="space-y-2 pt-4 border-t">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Tồn tối thiểu</span>
+                  <span className="font-medium">
                     {product.min_stock} {product.unit}
                   </span>
                 </div>
                 {product.max_stock && (
-                  <div className="flex justify-between text-slate-500">
-                    <span>Định mức tối đa:</span>
-                    <span className="font-bold">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tồn tối đa</span>
+                    <span className="font-medium">
                       {product.max_stock} {product.unit}
                     </span>
                   </div>
@@ -347,49 +330,50 @@ export default async function ProductDetailPage({
             </CardContent>
           </Card>
 
-          {/* CARD GIÁ CẢ */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs uppercase tracking-widest text-slate-500">
-                Thông tin tài chính
+          {/* Financial Card */}
+          <Card className="border bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Thông tin giá
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-slate-500">Giá bán lẻ</p>
-                <p className="text-2xl font-bold text-blue-600">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Giá bán</p>
+                <p className="text-xl font-semibold">
                   {formatPrice(product.sale_price)}
                 </p>
               </div>
+
               <Separator />
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-slate-400 uppercase">
-                    Giá nhập TB
-                  </p>
-                  <p className="font-bold text-slate-700">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Giá nhập</p>
+                  <p className="font-medium">
                     {formatPrice(product.cost_price || 0)}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-400 uppercase">
-                    Lợi nhuận dự kiến
-                  </p>
-                  <p className="font-bold text-green-600">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Lợi nhuận</p>
+                  <p className="font-medium text-emerald-600">
                     +{formatPrice(profit)}
                   </p>
                 </div>
               </div>
-              <div className="bg-green-50 p-3 rounded-lg flex items-center justify-between border border-green-100">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                  <span className="text-xs font-bold text-green-800 uppercase">
-                    Tỷ suất LN
+
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-800/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                    <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                      Tỷ suất LN
+                    </span>
+                  </div>
+                  <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                    {profitMargin}%
                   </span>
                 </div>
-                <span className="text-lg font-black text-green-700">
-                  {profitMargin}%
-                </span>
               </div>
             </CardContent>
           </Card>

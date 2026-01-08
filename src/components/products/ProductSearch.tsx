@@ -79,16 +79,16 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { Product } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 interface ProductSearchProps {
-  products: Product[]; // Interface yêu cầu mảng
+  products: Product[];
   onSelect: (product: Product) => void;
 }
 
 export function ProductSearch({ products = [], onSelect }: ProductSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Kiểm tra an toàn: nếu products rỗng hoặc không phải mảng, gán mảng rỗng
   const safeProducts = Array.isArray(products) ? products : [];
 
   const filtered =
@@ -103,35 +103,53 @@ export function ProductSearch({ products = [], onSelect }: ProductSearchProps) {
   return (
     <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Tìm tên thuốc hoặc mã nội bộ..."
-          className="pl-8"
+          placeholder="Tìm kiếm sản phẩm..."
+          className="pl-9"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
       {filtered.length > 0 && (
-        <div className="absolute z-50 w-full bg-white border rounded-md mt-1 shadow-xl max-h-64 overflow-y-auto">
+        <div className="absolute z-50 w-full bg-card border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
           {filtered.map((product) => (
             <div
               key={product.id}
-              className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 transition-colors"
+              className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-0 transition-colors"
               onClick={() => {
                 onSelect(product);
                 setSearchTerm("");
               }}
             >
-              <div className="font-bold text-sm text-blue-700">
-                {product.name}
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>Mã: {product.internal_code}</span>
-                <span>
-                  Tồn: <b className="text-gray-700">{product.current_stock}</b>{" "}
-                  {product.unit}
-                </span>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1 flex-1">
+                  <div className="font-medium text-sm">{product.name}</div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0">
+                      {product.internal_code}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Tồn: {product.current_stock} {product.unit}
+                    </span>
+                  </div>
+                </div>
+                {product.manage_by_batch ? (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-violet-100 text-violet-800"
+                  >
+                    Theo lô
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-blue-100 text-blue-800"
+                  >
+                    Tổng hợp
+                  </Badge>
+                )}
               </div>
             </div>
           ))}
@@ -139,8 +157,10 @@ export function ProductSearch({ products = [], onSelect }: ProductSearchProps) {
       )}
 
       {searchTerm !== "" && filtered.length === 0 && (
-        <div className="absolute z-50 w-full bg-white border rounded-md mt-1 p-4 text-center text-sm text-gray-500 shadow-lg">
-          Không tìm thấy sản phẩm nào khớp với từ khóa
+        <div className="absolute z-50 w-full bg-card border rounded-lg mt-1 p-4 text-center">
+          <div className="text-sm text-muted-foreground">
+            Không tìm thấy sản phẩm
+          </div>
         </div>
       )}
     </div>
