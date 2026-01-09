@@ -18,6 +18,7 @@ export interface Product {
   updated_at: string;
   current_stock: number;
   manage_by_batch: boolean; // THÊM TRƯỜNG NÀY
+  units?: ProductUnit[]; // Mảng chứa các đơn vị tính quy đổi
 }
 
 // @/types/index.ts
@@ -47,6 +48,15 @@ export interface ProductFilters {
   max_price?: number;
   low_stock?: boolean;
 }
+export interface ProductUnit {
+  id?: string;
+  product_id?: string;
+  unit_name: string;        // "Viên", "Vỉ", "Hộp"...
+  conversion_factor: number; // 1, 10, 100...
+  sale_price: number;       // Giá bán của đơn vị này
+  is_base_unit: boolean;    // Đơn vị nhỏ nhất để quản lý tồn kho
+}
+
 
 export interface InventorySnapshot {
   product_id: string;
@@ -116,9 +126,15 @@ export interface SaleItem {
   id: string;
   sale_id: string;
   product_id: string;
-  quantity: number;
-  unit_price: number;
+  quantity: number;      // Số lượng theo đơn vị đã chọn (ví dụ: 2 vỉ)
+  unit_price: number;    // Giá bán thực tế (có thể đã sửa tay)
   total_price: number;
+  batch_id?: string | null;      // Bán từ lô nào
+  product_unit_id?: string | null; // Đơn vị đã chọn (Viên/Vỉ/Hộp)
+  
+  // Thông tin thêm để hiển thị trên UI POS
+  unit_name?: string;     
+  conversion_factor?: number; 
 }
 
 export interface InventoryTransaction {
