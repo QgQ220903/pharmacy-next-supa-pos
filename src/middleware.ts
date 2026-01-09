@@ -22,13 +22,15 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Nếu chưa đăng nhập mà không phải ở trang login -> Về login
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+
+  // 1. Nếu CHƯA login và KHÔNG ở trang login -> Đẩy về login
+  if (!user && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Nếu ĐÃ đăng nhập mà vẫn ở trang login -> Vào dashboard
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // 2. Nếu ĐÃ login mà cố vào trang login -> Đẩy về sản phẩm
+  if (user && isLoginPage) {
     return NextResponse.redirect(new URL('/products', request.url))
   }
 
@@ -36,5 +38,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Bỏ 'login' ra khỏi danh sách loại trừ để Middleware chạy qua trang này
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

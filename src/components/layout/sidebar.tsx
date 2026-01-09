@@ -11,17 +11,13 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  Settings,
-  Users,
-  Bell,
   Moon,
   Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Thêm useEffect
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
@@ -29,7 +25,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTheme } from "next-themes";
-import LogoutButton from "../auth/LogoutButton";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -44,7 +39,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const { theme, setTheme } = useTheme();
-  const [notifications] = useState(5);
+  const [mounted, setMounted] = useState(false);
+
+  // Khắc phục lỗi Hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <TooltipProvider>
@@ -64,12 +64,8 @@ export default function Sidebar() {
                   <Package className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-bold text-lg tracking-tight">
-                    MedPOS
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Pharmacy System
-                  </span>
+                  <span className="font-bold text-lg tracking-tight">MedPOS</span>
+                  <span className="text-xs text-muted-foreground">Pharmacy System</span>
                 </div>
               </Link>
               <Button
@@ -100,96 +96,12 @@ export default function Sidebar() {
           )}
         </div>
 
-        {/* Theme Toggle & Notifications */}
-        <div
-          className={cn(
-            "flex items-center gap-2 p-4 border-b",
-            collapsed ? "justify-center flex-col gap-3" : "justify-between"
-          )}
-        >
-          {collapsed ? (
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 relative"
-                    onClick={() =>
-                      setTheme(theme === "dark" ? "light" : "dark")
-                    }
-                  >
-                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>Chuyển chế độ</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 relative"
-                  >
-                    <Bell className="h-4 w-4" />
-                    {notifications > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                        {notifications}
-                      </Badge>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>Thông báo ({notifications})</p>
-                </TooltipContent>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 justify-start gap-2"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="ml-2">
-                  {theme === "dark" ? "Sáng" : "Tối"}
-                </span>
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 justify-start gap-2 relative"
-              >
-                <Bell className="h-4 w-4" />
-                <span>Thông báo</span>
-                {notifications > 0 && (
-                  <Badge
-                    variant="destructive"
-                    className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-xs"
-                  >
-                    {notifications}
-                  </Badge>
-                )}
-              </Button>
-            </>
-          )}
-        </div>
-
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4">
           <nav className="space-y-1 px-3">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive =
-                pathname === item.href || pathname?.startsWith(item.href + "/");
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
 
               if (collapsed) {
                 return (
@@ -226,17 +138,10 @@ export default function Sidebar() {
                   )}
                 >
                   <div className="relative">
-                    <Icon
-                      className={cn(
-                        "h-5 w-5 transition-transform",
-                        isActive && "scale-110"
-                      )}
-                    />
+                    <Icon className={cn("h-5 w-5 transition-transform", isActive && "scale-110")} />
                   </div>
                   <span className="flex-1">{item.name}</span>
-                  {isActive && (
-                    <div className="h-2 w-2 rounded-full bg-primary" />
-                  )}
+                  {isActive && <div className="h-2 w-2 rounded-full bg-primary" />}
                 </Link>
               );
             })}
@@ -244,9 +149,48 @@ export default function Sidebar() {
         </div>
 
         <Separator />
-        
-              <LogoutButton />
 
+        {/* Theme Toggle - Bọc trong điều kiện mounted */}
+        <div className="p-4">
+          {!mounted ? (
+            <div className="h-9 w-full bg-muted animate-pulse rounded-md" />
+          ) : collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 mx-auto"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                >
+                  {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Chuyển chế độ</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            >
+              {theme === "dark" ? (
+                <>
+                  <Moon className="h-4 w-4" />
+                  <span className="ml-2">Chế độ tối</span>
+                </>
+              ) : (
+                <>
+                  <Sun className="h-4 w-4" />
+                  <span className="ml-2">Chế độ sáng</span>
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );

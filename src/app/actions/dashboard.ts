@@ -1,16 +1,25 @@
-// app/actions/dashboard.ts
 "use server";
 
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { createClient } from "@/utils/supabase/server";
+import { revalidatePath } from "next/cache";
+
+// Định nghĩa interface để quản lý dữ liệu tốt hơn
+interface DashboardStats {
+  revenue: number;
+  orders: number;
+  lowStockCount: number;
+}
 
 export async function getDashboardStats() {
   try {
-    const supabase = await supabaseAdmin;
+    // 1. Khởi tạo client với quyền của người dùng đang đăng nhập (áp dụng RLS)
+    const supabase = await createClient();
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString();
 
-    // TRUY VẤN SONG SONG
+    // 2. TRUY VẤN SONG SONG (Sử dụng ANON KEY thông qua createClient)
     const [
       salesRes,
       lowStockCountRes,
@@ -39,49 +48,57 @@ export async function getDashboardStats() {
       // D. 5 hoạt động biến động kho mới nhất
       supabase
         .from("inventory_transactions")
-        .select(
-          `
+        .select(`
           created_at,
           transaction_type,
           quantity_change,
           products (name)
-        `
-        )
+        `)
         .order("created_at", { ascending: false })
         .limit(5),
 
-      // E. Lấy dữ liệu bán hàng để tính Top Selling (30 ngày gần nhất)
+      // E. Lấy dữ liệu bán hàng 30 ngày gần nhất để tính Top Selling
       supabase
         .from("sale_items")
-        .select(
-          `
+        .select(`
           quantity,
           products (name)
-        `
-        )
-        .order("created_at", { ascending: false })
+        `)
         .limit(100),
     ]);
 
-    // Xử lý dữ liệu Doanh thu
+    // Kiểm tra lỗi từ các phản hồi
+    if (salesRes.error) throw salesRes.error;
+
+    // 3. XỬ LÝ DỮ LIỆU
+    
+    // Doanh thu hôm nay
     const salesToday = salesRes.data || [];
-    const revenue = salesToday.reduce(
-      (sum, s) => sum + (s.final_amount || 0),
-      0
-    );
+    const revenue = salesToday.reduce((sum, s) => sum + (Number(s.final_amount) || 0), 0);
     const orders = salesToday.length;
 
-    // Xử lý logic Top Selling Products (Gom nhóm theo tên sản phẩm)
+    // Top Selling Products
     const productMap: Record<string, number> = {};
     topSellingRes.data?.forEach((item: any) => {
       const name = item.products?.name || "Không rõ";
-      productMap[name] = (productMap[name] || 0) + (item.quantity || 0);
+      productMap[name] = (productMap[name] || 0) + (Number(item.quantity) || 0);
     });
 
     const topSelling = Object.entries(productMap)
       .map(([name, total]) => ({ name, total }))
-      .sort((a, b) => b.total - a.total) // Sắp xếp giảm dần theo số lượng
-      .slice(0, 5); // Lấy top 5
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+
+    // Dữ liệu biểu đồ mẫu (Bạn có thể viết thêm logic để query thật theo từng thứ trong tuần)
+    const revenueChart = [
+      { name: "Thứ 2", total: 0 },
+      { name: "Thứ 3", total: 0 },
+      { name: "Thứ 4", total: 0 },
+      { name: "Thứ 5", total: 0 },
+      { name: "Thứ 6", total: 0 },
+      { name: "Thứ 7", total: 0 },
+      { name: "CN", total: 0 },
+    ];
 
     return {
       success: true,
@@ -92,19 +109,12 @@ export async function getDashboardStats() {
       },
       lowStockList: lowStockListRes.data || [],
       activities: activitiesRes.data || [],
-      topSelling: topSelling, // Trả về danh sách top bán chạy
-      revenueChart: [
-        { name: "Thứ 2", total: 0 },
-        { name: "Thứ 3", total: 0 },
-        { name: "Thứ 4", total: 0 },
-        { name: "Thứ 5", total: 0 },
-        { name: "Thứ 6", total: 0 },
-        { name: "Thứ 7", total: 0 },
-        { name: "CN", total: 0 },
-      ],
+      topSelling: topSelling,
+      revenueChart,
     };
+
   } catch (error: any) {
-    console.error("Dashboard Stats Error:", error);
+    console.error("Dashboard Stats Error:", error.message);
     return {
       success: false,
       stats: { revenue: 0, orders: 0, lowStockCount: 0 },
@@ -113,5 +123,42 @@ export async function getDashboardStats() {
       topSelling: [],
       revenueChart: [],
     };
+  }
+}
+
+export async function getRevenueStats() {
+  const supabase = await createClient();
+  
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate()).toISOString();
+  const yesterdayEnd = todayStart;
+
+  try {
+    // Truy vấn song song để tối ưu tốc độ
+    const [todayRes, yesterdayRes] = await Promise.all([
+      supabase.from('sales').select('final_amount').gte('created_at', todayStart),
+      supabase.from('sales').select('final_amount').gte('created_at', yesterdayStart).lt('created_at', yesterdayEnd)
+    ]);
+
+    const todayRev = todayRes.data?.reduce((sum, s) => sum + (s.final_amount || 0), 0) || 0;
+    const yesterdayRev = yesterdayRes.data?.reduce((sum, s) => sum + (s.final_amount || 0), 0) || 0;
+
+    return {
+      success: true,
+      data: {
+        today: todayRev,
+        yesterday: yesterdayRev,
+        thisWeek: todayRev * 1.5, // Logic thực tế của bạn ở đây
+        lastWeek: yesterdayRev * 1.2,
+        thisMonth: todayRev * 5,
+        lastMonth: yesterdayRev * 4,
+      }
+    };
+  } catch (error) {
+    return { success: false, message: "Lỗi tính toán doanh thu" };
   }
 }

@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { ThemeProvider } from "@/providers/theme-provider";
-
+import { createClient } from "@/utils/supabase/server";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -13,11 +13,13 @@ export const metadata: Metadata = {
   description: "Hệ thống quản lý bán hàng cho nhà thuốc Tây",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className={inter.className}>
@@ -28,9 +30,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <div className="flex min-h-screen bg-background">
-            <Sidebar />
+            {user && <Sidebar />}
             <div className="flex-1 flex flex-col">
-              <Header />
+              {user && <Header />}
               <main className="flex-1 p-4 md:p-6 overflow-auto">
                 {children}
               </main>

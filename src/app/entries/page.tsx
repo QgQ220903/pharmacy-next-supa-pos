@@ -1,46 +1,31 @@
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { getStockEntriesAction } from "@/app/actions/inventory"; // Đường dẫn file action của bạn
 import EntryListClient from "@/components/entries/EntryListClient";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Plus, Download, Package2 } from "lucide-react";
+import { Plus, Download, Package2, AlertCircle } from "lucide-react";
 
 export default async function EntriesPage() {
-  const { data: entries, error } = await supabaseAdmin
-    .from("stock_entries")
-    .select(
-      `
-      *,
-      items:stock_entry_items(
-        id,
-        quantity,
-        unit_price,
-        total_price,
-        batch_number,
-        expiry_date,
-        products(name, unit)
-      )
-    `
-    )
-    .order("created_at", { ascending: false });
+  // Gọi hàm action thay vì dùng trực tiếp supabaseAdmin
+  const result = await getStockEntriesAction({ page: 1, limit: 50 });
 
-  if (error) {
+  if (!result.success) {
     return (
-      <div className="container mx-auto py-10">
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center animate-in fade-in duration-500">
-          <p className="text-destructive font-medium">
-            Lỗi tải dữ liệu: {error.message}
+      <div className="container mx-auto py-20">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-destructive/20 bg-destructive/5 p-12 text-center">
+          <AlertCircle className="h-10 w-10 text-destructive mb-4" />
+          <h2 className="text-xl font-semibold text-destructive">Không thể tải dữ liệu</h2>
+          <p className="text-muted-foreground mt-2 max-w-xs">
+            Đã xảy ra lỗi khi kết nối với cơ sở dữ liệu. Vui lòng kiểm tra lại quyền truy cập.
           </p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            onClick={() => window.location.reload()}
-          >
-            Thử lại
+          <Button variant="outline" className="mt-6" asChild>
+            <Link href="/dashboard">Quay lại Dashboard</Link>
           </Button>
         </div>
       </div>
     );
   }
+
+  const entries = result.data;
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
@@ -54,7 +39,7 @@ export default async function EntriesPage() {
             <div className="space-y-0.5">
               <h1 className="text-3xl font-bold tracking-tight">Nhập hàng</h1>
               <p className="text-sm text-muted-foreground">
-                Quản lý phiếu nhập kho và lô hàng chi tiết
+                Quản lý phiếu nhập kho và lô hàng chi tiết ({result.totalCount} phiếu)
               </p>
             </div>
           </div>
@@ -83,7 +68,7 @@ export default async function EntriesPage() {
 
         {/* Content Section */}
         <div className="rounded-xl text-card-foreground overflow-hidden border-border/50">
-          <EntryListClient initialEntries={entries || []} />
+          <EntryListClient initialEntries={entries} />
         </div>
       </div>
     </div>
