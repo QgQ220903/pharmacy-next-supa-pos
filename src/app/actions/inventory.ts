@@ -291,7 +291,19 @@ export async function createStockEntryAction(data: {
     }
 
     revalidatePath("/inventory");
-    return { success: true, entryCode: entry.entry_code };
+    return { 
+  success: true, 
+  entryCode: entry.entry_code,
+  // Trả thêm dữ liệu này để làm danh sách in tem
+  printData: data.items.map(item => ({
+    name: item.product_name, // Đảm bảo chú truyền product_name từ FE lên
+    unit: item.unit_name,
+    batch: item.batch_number,
+    expiry: item.expiry_date,
+    price: item.sale_price, // Giá bán để dán tem
+    quantity: item.quantity // Số lượng tem cần in
+  }))
+};
   } catch (error: any) {
     return { success: false, message: error.message };
   }
