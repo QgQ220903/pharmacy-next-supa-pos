@@ -467,26 +467,33 @@ export async function toggleProductStatus(id: string, status: boolean) {
 /**
  * 7. XÓA SẢN PHẨM
  */
-export async function deleteProduct(id: string) {
-  try {
-    const supabase = await createClient();
-    const { count } = await supabase
-      .from("inventory_transactions")
-      .select("*", { count: "exact", head: true })
-      .eq("product_id", id);
+export async function deleteProductAction(productId: string) {
+  const supabase = await createClient();
 
-    if (count && count > 0) {
-      throw new Error("Không thể xóa sản phẩm đã có lịch sử nhập/xuất kho.");
-    }
+  // 1. Kiểm tra xem đã có giao dịch bán hàng chưa
+  const { count: saleCount } = await supabase
+    .from("sale_items")
+    .select("*", { count: 'exact', head: true })
+    .eq("product_id", productId);
 
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) throw error;
+  // 2. Kiểm tra xem đã có phiếu nhập kho chưa
+  const { count: entryCount } = await supabase
+    .from("stock_entry_items")
+    .select("*", { count: 'exact', head: true })
+    .eq("product_id", productId);
 
-    revalidatePath("/products");
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, message: error.message };
+  if ((saleCount || 0) > 0 || (entryCount || 0) > 0) {
+    return { 
+      success: false, 
+      message: "Không thể xóa vì sản phẩm này đã có lịch sử nhập/bán. Hãy chọn 'Ngừng kinh doanh' thay vì xóa." 
+    };
   }
+
+  // 3. Nếu chưa có gì thì cho phép xóa vĩnh viễn
+  const { error } = await supabase.from("products").delete().eq("id", productId);
+  
+  if (error) return { success: false, message: "Lỗi khi xóa: " + error.message };
+  return { success: true, message: "Đã xóa sản phẩm thành công!" };
 }
 
 /**

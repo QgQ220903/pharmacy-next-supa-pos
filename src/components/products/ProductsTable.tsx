@@ -20,17 +20,31 @@ import {
   Layers,
   Box,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { toggleProductStatus } from "@/app/actions/products";
+import { toggleProductStatus, deleteProductAction } from "@/app/actions/products"; // Thêm hàm deleteProduct
 import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuSeparator, // Thêm Separator
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"; // Thêm AlertDialog
+import { useState } from "react"; // Thêm useState
+import { DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 
 interface ProductExt extends Product {
   product_batches: ProductBatch[];
@@ -40,12 +54,12 @@ interface ProductExt extends Product {
 export function ProductsTable({ products }: { products: ProductExt[] }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [deletingId, setDeletingId] = useState<string | null>(null); // State để theo dõi đang xóa sản phẩm nào
 
-const onToggle = async (id: string, currentStatus: boolean) => {
+  const onToggle = async (id: string, currentStatus: boolean) => {
     try {
       const newStatus = !currentStatus;
-      // Gọi trực tiếp hàm đã import ở đầu file
-      const res = await toggleProductStatus(id, newStatus); 
+      const res = await toggleProductStatus(id, newStatus);
       
       if (res.success) {
         toast.success(`Đã ${newStatus ? 'kích hoạt' : 'tạm ngừng'} kinh doanh`);
@@ -55,7 +69,35 @@ const onToggle = async (id: string, currentStatus: boolean) => {
     } catch (error: any) {
       toast.error("Lỗi bảo mật hoặc kết nối: " + error.message);
     }
-};
+  };
+
+  // Hàm xóa sản phẩm
+  const handleDelete = async (id: string, name: string) => {
+    if (deletingId) return; // Đang xóa thì không cho xóa tiếp
+    
+    try {
+      setDeletingId(id);
+      
+      // Hiển thị xác nhận trước khi xóa
+      if (!confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${name}"? Hành động này không thể hoàn tả.`)) {
+        setDeletingId(null);
+        return;
+      }
+
+      const res = await deleteProductAction(id);
+      
+      if (res.success) {
+        toast.success(`Đã xóa sản phẩm "${name}" thành công`);
+        // Có thể thêm logic reload danh sách ở đây nếu cần
+      } else {
+        toast.error(res.message || "Xóa sản phẩm thất bại");
+      }
+    } catch (error: any) {
+      toast.error("Lỗi khi xóa sản phẩm: " + error.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (products.length === 0) {
     return (
@@ -209,6 +251,61 @@ const onToggle = async (id: string, currentStatus: boolean) => {
                           </>
                         )}
                       </DropdownMenuItem>
+                      
+                      <DropdownMenuSeparator />
+                      
+                      {/* Option 1: Xóa ngay với confirm đơn giản */}
+                      <DropdownMenuItem 
+                        onClick={() => handleDelete(p.id, p.name)}
+                        disabled={deletingId === p.id}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        {deletingId === p.id ? (
+                          <>
+                            <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            Đang xóa...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Xóa sản phẩm
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      
+                      {/* Option 2: Sử dụng AlertDialog cho xác nhận đẹp hơn */}
+                      {/*
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem 
+                            onSelect={(e) => e.preventDefault()}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Xóa sản phẩm
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Xác nhận xóa sản phẩm</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Bạn có chắc chắn muốn xóa sản phẩm "{p.name}"? 
+                              Hành động này không thể hoàn tả. Tất cả dữ liệu liên quan sẽ bị xóa.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Hủy</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDelete(p.id, p.name)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              disabled={deletingId === p.id}
+                            >
+                              {deletingId === p.id ? "Đang xóa..." : "Xóa sản phẩm"}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      */}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -217,7 +314,6 @@ const onToggle = async (id: string, currentStatus: boolean) => {
           ))}
         </TableBody>
       </Table>
-      
     </div>
   );
 }
