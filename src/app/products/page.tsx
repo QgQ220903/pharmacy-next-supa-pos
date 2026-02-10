@@ -3,6 +3,8 @@ import {
   getProducts,
   getProductCategories,
   getProductStats,
+  getProductsForExport,
+  generateExcelFromProducts,
 } from "@/app/actions/products";
 import { ProductsTable } from "@/components/products/ProductsTable";
 import { ProductFilters } from "@/components/products/ProductFilter";
@@ -11,7 +13,7 @@ import { ProductActions } from "@/components/products/ProductActions";
 import { PaginationControl } from "@/components/products/PaginationControl";
 import ProductsLoading from "./loading";
 import { ProductFilters as ProductFiltersType } from "@/types"; // Import type
-
+import * as XLSX from "xlsx";
 interface ProductsPageProps {
   searchParams: Promise<{
     page?: string;
@@ -22,6 +24,30 @@ interface ProductsPageProps {
     min_price?: string; // THÊM DÒNG NÀY
     max_price?: string; // THÊM DÒNG NÀY
   }>;
+}
+
+// Tạo function xử lý export trong page
+async function handleExportInPage(filters: ProductFiltersType) {
+  "use server";
+
+  try {
+    // 1. Lấy dữ liệu sản phẩm
+    const productsResult = await getProductsForExport(filters);
+
+    if (!productsResult.success || !productsResult.data) {
+      return {
+        success: false,
+        message: productsResult.message || "Không lấy được dữ liệu",
+      };
+    }
+
+    // 2. Tạo file Excel từ dữ liệu
+    const excelResult = await generateExcelFromProducts(productsResult.data);
+
+    return excelResult;
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
 }
 
 async function ProductsContent({ searchParams }: ProductsPageProps) {
@@ -37,8 +63,8 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
       params.is_active === "true"
         ? true
         : params.is_active === "false"
-        ? false
-        : undefined,
+          ? false
+          : undefined,
     low_stock: params.low_stock === "true",
     // QUAN TRỌNG: Parse giá từ string sang number
     min_price: params.min_price ? Number(params.min_price) : undefined,
@@ -47,8 +73,18 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
 
   // Debug để kiểm tra
   console.log("Filters from URL:", filters);
-  console.log("min_price:", filters.min_price, "type:", typeof filters.min_price);
-  console.log("max_price:", filters.max_price, "type:", typeof filters.max_price);
+  console.log(
+    "min_price:",
+    filters.min_price,
+    "type:",
+    typeof filters.min_price,
+  );
+  console.log(
+    "max_price:",
+    filters.max_price,
+    "type:",
+    typeof filters.max_price,
+  );
 
   // Gọi API với phân trang
   const [{ products, totalCount }, categories, stats] = await Promise.all([
@@ -70,7 +106,14 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
               Tra cứu và quản lý tồn kho dược phẩm
             </p>
           </div>
-          <ProductActions />
+          <ProductActions
+            filters={filters}
+            productCount={totalCount}
+            onExport={async () => {
+              "use server";
+              return await handleExportInPage(filters);
+            }}
+          />{" "}
         </div>
       </div>
 
@@ -116,7 +159,6 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
           </div>
         )}
       </div>
-
     </div>
   );
 }

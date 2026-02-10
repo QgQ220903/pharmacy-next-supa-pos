@@ -1,4 +1,14 @@
 //"@types/index.ts"
+
+// Thêm interface cho response
+export interface PaginatedResponse<T> {
+  success: boolean;
+  data: T[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+  message?: string;
+}
 export interface Product {
   id: string;
   internal_code: string;
@@ -51,12 +61,11 @@ export interface ProductFilters {
 export interface ProductUnit {
   id?: string;
   product_id?: string;
-  unit_name: string;        // "Viên", "Vỉ", "Hộp"...
+  unit_name: string; // "Viên", "Vỉ", "Hộp"...
   conversion_factor: number; // 1, 10, 100...
-  sale_price: number;       // Giá bán của đơn vị này
-  is_base_unit: boolean;    // Đơn vị nhỏ nhất để quản lý tồn kho
+  sale_price: number; // Giá bán của đơn vị này
+  is_base_unit: boolean; // Đơn vị nhỏ nhất để quản lý tồn kho
 }
-
 
 export interface InventorySnapshot {
   product_id: string;
@@ -86,6 +95,24 @@ export interface ProductBatch {
   updated_at: string; // THÊM MỚI
 }
 
+// export interface StockEntryItem {
+//   id: string;
+//   stock_entry_id: string;
+//   product_id: string;
+//   quantity: number;
+//   unit_price: number;
+//   total_price: number;
+//   created_at?: string; // Khớp với SQL
+//   batch_number?: string | null;
+//   expiry_date?: string | null;
+//   manufacturer?: string | null; // THÊM MỚI
+//   registration_number?: string | null; // THÊM MỚI
+//   products?: {
+//     name: string;
+//     unit: string;
+//   };
+// }
+// Trong @/types/index.ts, thêm/điều chỉnh:
 export interface StockEntryItem {
   id: string;
   stock_entry_id: string;
@@ -93,14 +120,16 @@ export interface StockEntryItem {
   quantity: number;
   unit_price: number;
   total_price: number;
-  created_at?: string; // Khớp với SQL
+  created_at?: string;
   batch_number?: string | null;
   expiry_date?: string | null;
-  manufacturer?: string | null; // THÊM MỚI
-  registration_number?: string | null; // THÊM MỚI
+  manufacturer?: string | null;
+  registration_number?: string | null;
   products?: {
     name: string;
-    unit: string;
+    internal_code: string; // THÊM
+    base_unit: string; // ĐỔI TỪ unit
+    manage_by_batch?: boolean; // THÊM
   };
 }
 
@@ -126,15 +155,15 @@ export interface SaleItem {
   id: string;
   sale_id: string;
   product_id: string;
-  quantity: number;      // Số lượng theo đơn vị đã chọn (ví dụ: 2 vỉ)
-  unit_price: number;    // Giá bán thực tế (có thể đã sửa tay)
+  quantity: number; // Số lượng theo đơn vị đã chọn (ví dụ: 2 vỉ)
+  unit_price: number; // Giá bán thực tế (có thể đã sửa tay)
   total_price: number;
-  batch_id?: string | null;      // Bán từ lô nào
+  batch_id?: string | null; // Bán từ lô nào
   product_unit_id?: string | null; // Đơn vị đã chọn (Viên/Vỉ/Hộp)
-  
+
   // Thông tin thêm để hiển thị trên UI POS
-  unit_name?: string;     
-  conversion_factor?: number; 
+  unit_name?: string;
+  conversion_factor?: number;
 }
 
 export interface InventoryTransaction {

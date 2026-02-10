@@ -13,9 +13,10 @@ import {
   ChevronRight,
   Moon,
   Sun,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react"; // Thêm useEffect
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -41,7 +42,6 @@ export default function Sidebar() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // Khắc phục lỗi Hydration
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -50,47 +50,53 @@ export default function Sidebar() {
     <TooltipProvider>
       <div
         className={cn(
-          "hidden md:flex flex-col border-r bg-background transition-all duration-300 ease-in-out",
-          collapsed ? "w-16" : "w-64",
-          "sticky top-0 h-screen"
+          "hidden md:flex flex-col border-r bg-background",
+          collapsed ? "w-[70px]" : "w-[240px]",
+          "sticky top-0 h-screen transition-all duration-200",
         )}
       >
         {/* Logo & Toggle */}
         <div className="flex h-16 items-center justify-between px-4 border-b">
           {!collapsed ? (
             <>
-              <Link href="/" className="flex items-center gap-3 group">
-                <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center transition-transform group-hover:scale-105">
+              <Link href="/" className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
                   <Package className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-bold text-lg tracking-tight">MedPOS</span>
-                  <span className="text-xs text-muted-foreground">Pharmacy System</span>
+                  <span className="font-bold text-base tracking-tight text-foreground">
+                    MedPOS
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Pharmacy System
+                  </span>
                 </div>
               </Link>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full"
+                className="h-7 w-7"
                 onClick={() => setCollapsed(true)}
+                title="Thu nhỏ"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
             </>
           ) : (
             <>
               <Link href="/" className="mx-auto">
-                <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                <div className="h-9 w-9 rounded-md bg-primary flex items-center justify-center">
                   <Package className="h-5 w-5 text-primary-foreground" />
                 </div>
               </Link>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full absolute right-2"
+                className="h-7 w-7 absolute right-2"
                 onClick={() => setCollapsed(false)}
+                title="Mở rộng"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </>
           )}
@@ -98,29 +104,37 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4">
-          <nav className="space-y-1 px-3">
+          <nav className="space-y-0.5 px-2">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+              const isActive =
+                pathname === item.href || pathname?.startsWith(item.href + "/");
 
               if (collapsed) {
                 return (
-                  <Tooltip key={item.href} delayDuration={0}>
+                  <Tooltip key={item.href} delayDuration={100}>
                     <TooltipTrigger asChild>
                       <Link
                         href={item.href}
                         className={cn(
-                          "flex items-center justify-center rounded-lg px-3 py-3 transition-all relative",
+                          "flex items-center justify-center h-9 rounded-md mx-1 my-0.5 relative",
                           isActive
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted",
                         )}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-4 w-4" />
+                        {isActive && (
+                          <div className="absolute -left-0.5 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-primary" />
+                        )}
                       </Link>
                     </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p>{item.name}</p>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={10}
+                      className="px-2 py-1 text-xs"
+                    >
+                      {item.name}
                     </TooltipContent>
                   </Tooltip>
                 );
@@ -131,63 +145,94 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-3 transition-all group",
+                    "flex items-center gap-3 h-9 rounded-md px-3 mx-1 my-0.5",
                     isActive
-                      ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-muted-foreground hover:bg-muted",
                   )}
                 >
-                  <div className="relative">
-                    <Icon className={cn("h-5 w-5 transition-transform", isActive && "scale-110")} />
-                  </div>
-                  <span className="flex-1">{item.name}</span>
-                  {isActive && <div className="h-2 w-2 rounded-full bg-primary" />}
+                  <Icon className="h-4 w-4" />
+                  <span className="flex-1 text-sm">{item.name}</span>
+                  {isActive && (
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                  )}
                 </Link>
               );
             })}
           </nav>
         </div>
 
-        <Separator />
+        <Separator className="my-2" />
 
-        {/* Theme Toggle - Bọc trong điều kiện mounted */}
-        <div className="p-4">
+        {/* Bottom Actions */}
+        <div className="p-3 space-y-3">
+          {/* Theme Toggle */}
           {!mounted ? (
-            <div className="h-9 w-full bg-muted animate-pulse rounded-md" />
+            <div className="h-8 w-full bg-muted rounded-md animate-pulse" />
           ) : collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon"
-                  className="h-9 w-9 mx-auto"
+                  className="h-8 w-8 mx-auto"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 >
-                  {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                  {theme === "dark" ? (
+                    <Moon className="h-3.5 w-3.5" />
+                  ) : (
+                    <Sun className="h-3.5 w-3.5" />
+                  )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>Chuyển chế độ</p>
+              <TooltipContent side="right" sideOffset={10}>
+                Chuyển chế độ
               </TooltipContent>
             </Tooltip>
           ) : (
             <Button
               variant="outline"
-              size="sm"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-2 h-8 text-xs"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
               {theme === "dark" ? (
                 <>
-                  <Moon className="h-4 w-4" />
-                  <span className="ml-2">Chế độ tối</span>
+                  <Moon className="h-3.5 w-3.5" />
+                  <span>Chế độ tối</span>
                 </>
               ) : (
                 <>
-                  <Sun className="h-4 w-4" />
-                  <span className="ml-2">Chế độ sáng</span>
+                  <Sun className="h-3.5 w-3.5" />
+                  <span>Chế độ sáng</span>
                 </>
               )}
+            </Button>
+          )}
+
+          {/* Logout Button */}
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="h-9 w-9 mx-auto"
+                  title="Đăng xuất"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                Đăng xuất
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="destructive"
+              className="w-full justify-start gap-2 h-9"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="text-sm font-medium">Đăng xuất</span>
             </Button>
           )}
         </div>

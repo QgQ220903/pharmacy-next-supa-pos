@@ -3,7 +3,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Package, AlertTriangle, CheckCircle, BarChart3 } from "lucide-react";
 import { cn, formatCompactNumber, formatNumber } from "@/lib/utils";
-import { useTheme } from "next-themes";
 
 interface StatsCardsProps {
   stats: {
@@ -17,19 +16,16 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ stats: rawStats }: StatsCardsProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
   if (!rawStats) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="border bg-card">
-            <CardContent className="p-6">
-              <div className="space-y-3">
-                <div className="h-4 bg-muted rounded w-24 animate-pulse" />
-                <div className="h-8 bg-muted rounded w-32 animate-pulse" />
-                <div className="h-3 bg-muted rounded w-20 animate-pulse" />
+          <Card key={i} className="border">
+            <CardContent className="p-5">
+              <div className="space-y-4">
+                <div className="h-3 bg-muted/30 rounded w-20 animate-pulse" />
+                <div className="h-7 bg-muted/30 rounded w-24 animate-pulse" />
+                <div className="h-2 bg-muted/30 rounded w-16 animate-pulse" />
               </div>
             </CardContent>
           </Card>
@@ -47,16 +43,15 @@ export function StatsCards({ stats: rawStats }: StatsCardsProps) {
   } = rawStats;
 
   const totalAlerts = lowStockProducts + outOfStockProducts;
-  const activePercentage = totalProducts > 0 
-    ? Math.round((activeProducts / totalProducts) * 100) 
-    : 0;
+  const activePercentage =
+    totalProducts > 0 ? Math.round((activeProducts / totalProducts) * 100) : 0;
 
   const cards = [
     {
       title: "Tổng mặt hàng",
       value: formatNumber(totalProducts),
       icon: Package,
-      color: "text-blue-600 dark:text-blue-400",
+      iconColor: "text-blue-500",
       description: `${activeProducts} đang kinh doanh`,
       subDescription: activePercentage > 0 && `${activePercentage}% hoạt động`,
     },
@@ -64,25 +59,26 @@ export function StatsCards({ stats: rawStats }: StatsCardsProps) {
       title: "Đang kinh doanh",
       value: formatNumber(activeProducts),
       icon: CheckCircle,
-      color: "text-emerald-600 dark:text-emerald-400",
+      iconColor: "text-green-500",
       description: "Sản phẩm đang bán",
-      subDescription: totalProducts > 0 && `${totalProducts - activeProducts} tạm ngừng`,
+      subDescription:
+        totalProducts > 0 && `${totalProducts - activeProducts} tạm ngừng`,
     },
     {
       title: "Cảnh báo kho",
       value: formatNumber(totalAlerts),
       icon: AlertTriangle,
-      color: "text-amber-600 dark:text-amber-400",
-      description: totalAlerts === 0 
-        ? "Không có cảnh báo" 
-        : `${lowStockProducts} ít hàng, ${outOfStockProducts} hết hàng`,
-      highlight: totalAlerts > 0,
+      iconColor: totalAlerts > 0 ? "text-amber-500" : "text-gray-400",
+      description:
+        totalAlerts === 0
+          ? "Không có cảnh báo"
+          : `${lowStockProducts} ít hàng • ${outOfStockProducts} hết hàng`,
     },
     {
       title: "Giá trị tồn kho",
       value: formatCompactNumber(totalInventoryValue),
       icon: BarChart3,
-      color: "text-violet-600 dark:text-violet-400",
+      iconColor: "text-purple-500",
       description: "Tổng vốn tồn kho",
       suffix: " ₫",
     },
@@ -92,47 +88,43 @@ export function StatsCards({ stats: rawStats }: StatsCardsProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card, index) => {
         const Icon = card.icon;
+
         return (
-          <Card key={index} className="border bg-card hover:shadow-sm transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="space-y-4 flex-1">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted">
-                      <Icon className={cn("h-5 w-5", card.color)} />
-                    </div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {card.title}
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold tracking-tight">
-                        {card.value}
+          <Card key={index} className="border">
+            <CardContent className="p-5">
+              <div className="space-y-4">
+                {/* Header with Icon */}
+                <div className="flex items-center gap-3">
+                  <Icon className={cn("h-5 w-5", card.iconColor)} />
+                  <p className="text-sm font-medium text-foreground">
+                    {card.title}
+                  </p>
+                </div>
+
+                {/* Main Value */}
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-semibold text-foreground">
+                      {card.value}
+                    </span>
+                    {card.suffix && (
+                      <span className="text-sm text-muted-foreground">
+                        {card.suffix}
                       </span>
-                      {card.suffix && (
-                        <span className="text-sm font-medium text-muted-foreground">
-                          {card.suffix}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <p className={cn(
-                      "text-sm font-medium",
-                      card.highlight 
-                        ? "text-amber-600 dark:text-amber-400" 
-                        : "text-muted-foreground"
-                    )}>
-                      {card.description}
-                    </p>
-                    
-                    {card.subDescription && (
-                      <p className="text-xs text-muted-foreground">
-                        {card.subDescription}
-                      </p>
                     )}
                   </div>
+
+                  {/* Description */}
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {card.description}
+                  </p>
+
+                  {/* Sub Description */}
+                  {card.subDescription && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {card.subDescription}
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
