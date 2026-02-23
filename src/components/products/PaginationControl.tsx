@@ -1,133 +1,3 @@
-// "use client";
-// import { Button } from "@/components/ui/button";
-// import { useRouter, useSearchParams } from "next/navigation";
-// import { ChevronLeft, ChevronRight } from "lucide-react";
-// import { cn } from "@/lib/utils";
-
-// export function PaginationControl({
-//   totalCount,
-//   pageSize,
-// }: {
-//   totalCount: number;
-//   pageSize: number;
-// }) {
-//   const router = useRouter();
-//   const searchParams = useSearchParams();
-//   const currentPage = Number(searchParams.get("page")) || 1;
-//   const totalPages = Math.ceil(totalCount / pageSize);
-
-//   const onPageChange = (page: number) => {
-//     const params = new URLSearchParams(searchParams.toString());
-//     params.set("page", page.toString());
-//     router.push(`?${params.toString()}`);
-//   };
-
-//   const getPageNumbers = (): (number | string)[] => {
-//     const pages: (number | string)[] = [];
-//     const maxVisiblePages = 7;
-//     const ellipsis = "...";
-
-//     if (totalPages <= maxVisiblePages) {
-//       for (let i = 1; i <= totalPages; i++) {
-//         pages.push(i);
-//       }
-//       return pages;
-//     }
-
-//     let startPage = Math.max(2, currentPage - 1);
-//     let endPage = Math.min(totalPages - 1, currentPage + 1);
-
-//     if (currentPage <= 3) {
-//       startPage = 2;
-//       endPage = 4;
-//     } else if (currentPage >= totalPages - 2) {
-//       startPage = totalPages - 3;
-//       endPage = totalPages - 1;
-//     }
-
-//     pages.push(1);
-
-//     if (startPage > 2) {
-//       pages.push(ellipsis);
-//     }
-
-//     for (let i = startPage; i <= endPage; i++) {
-//       pages.push(i);
-//     }
-
-//     if (endPage < totalPages - 1) {
-//       pages.push(ellipsis);
-//     }
-
-//     pages.push(totalPages);
-
-//     return pages;
-//   };
-
-//   if (totalPages <= 1) return null;
-
-//   const pageNumbers = getPageNumbers();
-
-//   return (
-//     <div className="flex items-center justify-between">
-//       <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-//         Trang {currentPage} / {totalPages}
-//       </div>
-//       <div className="flex items-center gap-2">
-//         <Button
-//           variant="outline"
-//           size="sm"
-//           className="h-8 w-8 p-0"
-//           disabled={currentPage <= 1}
-//           onClick={() => onPageChange(currentPage - 1)}
-//         >
-//           <ChevronLeft className="h-4 w-4" />
-//         </Button>
-
-//         <div className="flex items-center gap-1">
-//           {pageNumbers.map((page, index) => {
-//             if (page === "...") {
-//               return (
-//                 <span
-//                   key={`ellipsis-${index}`}
-//                   className="h-8 w-8 flex items-center justify-center text-muted-foreground"
-//                 >
-//                   ...
-//                 </span>
-//               );
-//             }
-
-//             return (
-//               <Button
-//                 key={`page-${page}`}
-//                 variant={currentPage === page ? "default" : "outline"}
-//                 size="sm"
-//                 className={cn(
-//                   "h-8 w-8 p-0 min-w-8 font-medium",
-//                   currentPage === page && "bg-primary text-primary-foreground",
-//                 )}
-//                 onClick={() => onPageChange(page as number)}
-//               >
-//                 {page}
-//               </Button>
-//             );
-//           })}
-//         </div>
-
-//         <Button
-//           variant="outline"
-//           size="sm"
-//           className="h-8 w-8 p-0"
-//           disabled={currentPage >= totalPages}
-//           onClick={() => onPageChange(currentPage + 1)}
-//         >
-//           <ChevronRight className="h-4 w-4" />
-//         </Button>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
@@ -139,6 +9,7 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 export function PaginationControl({
   totalCount,
@@ -161,7 +32,7 @@ export function PaginationControl({
   // Hàm helper tạo mảng trang cần hiển thị
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
-    const maxVisiblePages = 7;
+    const maxVisiblePages = 5;
     const ellipsis = "...";
 
     if (totalPages <= maxVisiblePages) {
@@ -171,32 +42,25 @@ export function PaginationControl({
       return pages;
     }
 
-    let startPage = Math.max(2, currentPage - 2);
-    let endPage = Math.min(totalPages - 1, currentPage + 2);
-
+    // Luôn hiển thị trang 1, trang cuối, và 3 trang xung quanh current
     if (currentPage <= 3) {
-      startPage = 2;
-      endPage = 5;
+      // Gần đầu: 1,2,3,4,...,last
+      pages.push(1, 2, 3, 4);
+      if (totalPages > 5) pages.push(ellipsis);
+      pages.push(totalPages);
     } else if (currentPage >= totalPages - 2) {
-      startPage = totalPages - 4;
-      endPage = totalPages - 1;
-    }
-
-    pages.push(1);
-
-    if (startPage > 2) {
+      // Gần cuối: 1,..., last-3, last-2, last-1, last
+      pages.push(1);
+      if (totalPages > 5) pages.push(ellipsis);
+      pages.push(totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      // Ở giữa: 1,..., current-1, current, current+1,..., last
+      pages.push(1);
       pages.push(ellipsis);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-
-    if (endPage < totalPages - 1) {
+      pages.push(currentPage - 1, currentPage, currentPage + 1);
       pages.push(ellipsis);
+      pages.push(totalPages);
     }
-
-    pages.push(totalPages);
 
     return pages;
   };
@@ -206,69 +70,64 @@ export function PaginationControl({
   const pageNumbers = getPageNumbers();
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-        Trang {currentPage} / {totalPages} • {totalCount} kết quả
+    <div className="flex flex-col lg:flex-row items-center justify-between gap-4 py-2">
+      {/* Thông tin kết quả */}
+      <div className="text-sm text-muted-foreground order-2 lg:order-1">
+        <span className="font-medium text-foreground">{totalCount}</span> kết
+        quả
+        <span className="mx-2">•</span>
+        Trang <span className="font-medium text-foreground">{currentPage}</span>
+        /{totalPages}
       </div>
 
-      <div className="flex items-center gap-1">
-        {/* Nút về trang đầu - Disabled state vẫn dùng button */}
-        {currentPage <= 1 ? (
+      {/* Phân trang - Desktop */}
+      <div className="hidden md:flex items-center gap-1 order-1 lg:order-2">
+        {/* Nút về đầu */}
+        <Link
+          href={createPageUrl(1)}
+          prefetch={true}
+          className={cn(currentPage <= 1 && "pointer-events-none opacity-50")}
+          aria-disabled={currentPage <= 1}
+          tabIndex={currentPage <= 1 ? -1 : undefined}
+        >
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 hidden sm:flex"
-            disabled
-            title="Đầu trang"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage <= 1}
           >
             <ChevronsLeft className="h-4 w-4" />
           </Button>
-        ) : (
-          <Link
-            href={createPageUrl(1)}
-            prefetch={true}
-            className="hidden sm:flex"
-            title="Đầu trang"
-          >
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-        )}
+        </Link>
 
-        {/* Nút trang trước */}
-        {currentPage <= 1 ? (
+        {/* Nút lùi */}
+        <Link
+          href={createPageUrl(currentPage - 1)}
+          prefetch={true}
+          className={cn(currentPage <= 1 && "pointer-events-none opacity-50")}
+          aria-disabled={currentPage <= 1}
+          tabIndex={currentPage <= 1 ? -1 : undefined}
+        >
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            disabled
-            title="Trang trước"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage <= 1}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-        ) : (
-          <Link
-            href={createPageUrl(currentPage - 1)}
-            prefetch={true}
-            title="Trang trước"
-          >
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-        )}
+        </Link>
 
-        {/* Hiển thị các số trang */}
+        {/* Số trang */}
         <div className="flex items-center gap-1 mx-1">
           {pageNumbers.map((page, index) => {
             if (page === "...") {
               return (
                 <span
                   key={`ellipsis-${index}`}
-                  className="h-8 w-8 flex items-center justify-center text-muted-foreground"
+                  className="w-8 h-8 flex items-center justify-center text-sm text-muted-foreground"
                 >
-                  ...
+                  ⋯
                 </span>
               );
             }
@@ -281,14 +140,15 @@ export function PaginationControl({
                 key={`page-${pageNumber}`}
                 href={createPageUrl(pageNumber)}
                 prefetch={true}
-                title={`Trang ${pageNumber}`}
               >
                 <Button
-                  variant={isCurrentPage ? "default" : "outline"}
-                  size="sm"
+                  variant={isCurrentPage ? "default" : "ghost"}
+                  size="icon"
                   className={cn(
-                    "h-8 w-8 p-0 min-w-8 font-medium",
-                    isCurrentPage && "bg-primary text-primary-foreground",
+                    "h-8 w-8 text-sm font-normal",
+                    isCurrentPage
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
                   {pageNumber}
@@ -298,64 +158,128 @@ export function PaginationControl({
           })}
         </div>
 
-        {/* Nút trang sau */}
-        {currentPage >= totalPages ? (
+        {/* Nút tiến */}
+        <Link
+          href={createPageUrl(currentPage + 1)}
+          prefetch={true}
+          className={cn(
+            currentPage >= totalPages && "pointer-events-none opacity-50",
+          )}
+          aria-disabled={currentPage >= totalPages}
+          tabIndex={currentPage >= totalPages ? -1 : undefined}
+        >
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            disabled
-            title="Trang sau"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage >= totalPages}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
-        ) : (
-          <Link
-            href={createPageUrl(currentPage + 1)}
-            prefetch={true}
-            title="Trang sau"
-          >
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        )}
+        </Link>
 
-        {/* Nút đến trang cuối */}
-        {currentPage >= totalPages ? (
+        {/* Nút cuối */}
+        <Link
+          href={createPageUrl(totalPages)}
+          prefetch={true}
+          className={cn(
+            currentPage >= totalPages && "pointer-events-none opacity-50",
+          )}
+          aria-disabled={currentPage >= totalPages}
+          tabIndex={currentPage >= totalPages ? -1 : undefined}
+        >
           <Button
             variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 hidden sm:flex"
-            disabled
-            title="Cuối trang"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage >= totalPages}
           >
             <ChevronsRight className="h-4 w-4" />
           </Button>
-        ) : (
-          <Link
-            href={createPageUrl(totalPages)}
-            prefetch={true}
-            className="hidden sm:flex"
-            title="Cuối trang"
-          >
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </Link>
-        )}
+        </Link>
       </div>
 
-      {/* Input nhảy trang - Vẫn dùng router.push vì cần xử lý onKeyDown/onBlur */}
-      <div className="flex items-center gap-2">
+      {/* Phân trang - Mobile */}
+      <div className="flex md:hidden items-center justify-between w-full order-1 lg:order-2">
+        <Link
+          href={createPageUrl(1)}
+          prefetch={true}
+          className={cn(currentPage <= 1 && "pointer-events-none opacity-50")}
+        >
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage <= 1}
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+
+        <Link
+          href={createPageUrl(currentPage - 1)}
+          prefetch={true}
+          className={cn(currentPage <= 1 && "pointer-events-none opacity-50")}
+        >
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+
+        <span className="text-sm">
+          <span className="font-medium">{currentPage}</span>/{totalPages}
+        </span>
+
+        <Link
+          href={createPageUrl(currentPage + 1)}
+          prefetch={true}
+          className={cn(
+            currentPage >= totalPages && "pointer-events-none opacity-50",
+          )}
+        >
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage >= totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </Link>
+
+        <Link
+          href={createPageUrl(totalPages)}
+          prefetch={true}
+          className={cn(
+            currentPage >= totalPages && "pointer-events-none opacity-50",
+          )}
+        >
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            disabled={currentPage >= totalPages}
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
+
+      {/* Input nhảy trang - Desktop */}
+      <div className="hidden lg:flex items-center gap-2 order-3">
         <span className="text-sm text-muted-foreground">Đến trang:</span>
         <div className="flex items-center gap-1">
-          <input
+          <Input
             type="number"
-            min="1"
+            min={1}
             max={totalPages}
             defaultValue={currentPage}
-            className="w-16 h-8 border border-input rounded-md px-2 text-sm text-center"
+            className="w-16 h-8 text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

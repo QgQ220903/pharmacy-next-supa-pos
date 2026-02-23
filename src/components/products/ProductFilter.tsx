@@ -8,20 +8,23 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Search,
-  Filter,
   X,
   AlertTriangle,
-  EyeOff,
-  LayoutGrid,
-  Tag,
-  Loader2,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback, useEffect, useTransition } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Progress } from "@/components/ui/progress";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
 
 interface ProductFiltersProps {
   categories: string[];
@@ -38,10 +41,7 @@ export function ProductFilters({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // 1. Sử dụng useTransition để xử lý không chặn UI
   const [isPending, startTransition] = useTransition();
-
-  // 2. State local để quản lý ô search (giúp đồng bộ khi reset)
   const [searchValue, setSearchValue] = useState(initialFilters.search || "");
   const [minPriceValue, setMinPriceValue] = useState(
     initialFilters.min_price?.toString() || "",
@@ -49,12 +49,9 @@ export function ProductFilters({
   const [maxPriceValue, setMaxPriceValue] = useState(
     initialFilters.max_price?.toString() || "",
   );
-  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // 3. Progress animation
-  const [progress, setProgress] = useState(0);
-
-  // Đồng bộ state với URL khi thay đổi từ bên ngoài
+  // Đồng bộ state với URL
   useEffect(() => {
     setSearchValue(initialFilters.search || "");
     setMinPriceValue(initialFilters.min_price?.toString() || "");
@@ -64,29 +61,6 @@ export function ProductFilters({
     initialFilters.min_price,
     initialFilters.max_price,
   ]);
-
-  // Hiệu ứng progress khi đang loading
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPending) {
-      setProgress(0);
-      interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(interval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 100);
-    } else {
-      setProgress(100);
-      setTimeout(() => setProgress(0), 300);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPending]);
 
   const createQueryString = useCallback(
     (paramsToUpdate: Record<string, any>) => {
@@ -105,7 +79,6 @@ export function ProductFilters({
     [searchParams],
   );
 
-  // Hàm wrapper cho router.push với transition
   const pushWithTransition = useCallback(
     (url: string) => {
       startTransition(() => {
@@ -115,13 +88,11 @@ export function ProductFilters({
     [router, startTransition],
   );
 
-  // Debounce cho tìm kiếm
   const debouncedSearch = useDebouncedCallback((term: string) => {
     const query = createQueryString({ search: term });
     pushWithTransition(`${pathname}?${query}`);
   }, 400);
 
-  // Debounce cho lọc giá
   const debouncedPriceFilter = useDebouncedCallback(
     (min: string, max: string) => {
       const minNum = parseFloat(min);
@@ -129,21 +100,18 @@ export function ProductFilters({
 
       const params: Record<string, any> = {};
 
-      // Xử lý min price
       if (!isNaN(minNum) && minNum >= 0) {
         params.min_price = minNum;
       } else if (min === "") {
         params.min_price = "";
       }
 
-      // Xử lý max price
       if (!isNaN(maxNum) && maxNum >= 0) {
         params.max_price = maxNum;
       } else if (max === "") {
         params.max_price = "";
       }
 
-      // Chỉ cập nhật nếu có thay đổi
       if (Object.keys(params).length > 0) {
         const query = createQueryString(params);
         pushWithTransition(`${pathname}?${query}`);
@@ -174,337 +142,398 @@ export function ProductFilters({
   );
 
   const resetFilters = useCallback(() => {
-    // Reset tất cả state local
     setSearchValue("");
     setMinPriceValue("");
     setMaxPriceValue("");
-    setShowCategoryFilter(false);
+    setShowAdvancedFilters(false);
 
-    // Reset URL
     startTransition(() => {
       router.push(pathname);
     });
   }, [router, pathname]);
 
-  // Tính toán số filter đang active (không tính search và page)
+  const removeFilter = useCallback(
+    (key: string) => {
+      const query = createQueryString({ [key]: "" });
+      pushWithTransition(`${pathname}?${query}`);
+    },
+    [createQueryString, pathname, pushWithTransition],
+  );
+
   const activeFilterCount = Array.from(searchParams.entries()).filter(
     ([key, value]) => key !== "page" && value !== "" && key !== "search",
   ).length;
 
-  // Thêm filter search vào count nếu có
   const totalActiveFilters =
     activeFilterCount + (initialFilters.search ? 1 : 0);
 
-  // Xử lý thay đổi giá min
   const handleMinPriceChange = (value: string) => {
     setMinPriceValue(value);
     debouncedPriceFilter(value, maxPriceValue);
   };
 
-  // Xử lý thay đổi giá max
   const handleMaxPriceChange = (value: string) => {
     setMaxPriceValue(value);
     debouncedPriceFilter(minPriceValue, value);
   };
 
+  // Format giá trị filter để hiển thị
+  const getFilterDisplayValue = (key: string, value: any) => {
+    switch (key) {
+      case "search":
+        return `Tìm: "${value}"`;
+      case "category":
+        return `Danh mục: ${value}`;
+      case "is_active":
+        return value === "true" ? "Đang bán" : "Ngừng bán";
+      case "low_stock":
+        return "Sắp hết";
+      case "min_price":
+        return `Giá từ: ${Number(value).toLocaleString()}₫`;
+      case "max_price":
+        return `Giá đến: ${Number(value).toLocaleString()}₫`;
+      default:
+        return String(value);
+    }
+  };
+
+  // Lấy tất cả filters đang active
+  const getActiveFilters = () => {
+    const filters: { key: string; value: string; label: string }[] = [];
+
+    if (initialFilters.search) {
+      filters.push({
+        key: "search",
+        value: initialFilters.search,
+        label: getFilterDisplayValue("search", initialFilters.search),
+      });
+    }
+
+    if (initialFilters.category) {
+      filters.push({
+        key: "category",
+        value: initialFilters.category,
+        label: getFilterDisplayValue("category", initialFilters.category),
+      });
+    }
+
+    if (initialFilters.is_active !== undefined) {
+      filters.push({
+        key: "is_active",
+        value: String(initialFilters.is_active),
+        label: getFilterDisplayValue(
+          "is_active",
+          String(initialFilters.is_active),
+        ),
+      });
+    }
+
+    if (initialFilters.low_stock) {
+      filters.push({
+        key: "low_stock",
+        value: "true",
+        label: getFilterDisplayValue("low_stock", "true"),
+      });
+    }
+
+    if (initialFilters.min_price) {
+      filters.push({
+        key: "min_price",
+        value: String(initialFilters.min_price),
+        label: getFilterDisplayValue("min_price", initialFilters.min_price),
+      });
+    }
+
+    if (initialFilters.max_price) {
+      filters.push({
+        key: "max_price",
+        value: String(initialFilters.max_price),
+        label: getFilterDisplayValue("max_price", initialFilters.max_price),
+      });
+    }
+
+    return filters;
+  };
+
+  const activeFilters = getActiveFilters();
+
   return (
     <>
-      {/* Loading Progress Bar */}
-      <div
-        className={cn(
-          "fixed top-0 left-0 right-0 h-1 bg-primary/20 z-50 transition-opacity duration-300",
-          progress > 0 ? "opacity-100" : "opacity-0",
-        )}
-      >
-        <div
-          className="h-full bg-primary transition-all duration-200 ease-out"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      {/* Simple loading indicator */}
+      {isPending && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 bg-primary/20 z-50">
+          <div className="h-full bg-primary animate-progress" />
+        </div>
+      )}
 
-      <Card
-        className={cn(
-          "border-none shadow-none bg-transparent transition-opacity duration-200",
-          isPending && "opacity-70 pointer-events-none",
-        )}
-      >
-        <CardContent className="p-4 space-y-2">
-          {/* First Row: Search and Quick Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search Input */}
-            <div className="flex-1">
-              <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center">
-                  {isPending && searchValue ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  ) : (
-                    <Search className="h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  )}
-                </div>
-                <Input
-                  placeholder="Tìm kiếm tên thuốc, mã nội bộ, barcode..."
-                  value={searchValue}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSearchValue(value);
-                    debouncedSearch(value);
-                  }}
-                  className="pl-9 h-10 bg-background border-input"
-                  disabled={isPending}
-                />
-                {searchValue && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchValue("");
-                      const query = createQueryString({ search: "" });
-                      pushWithTransition(`${pathname}?${query}`);
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    disabled={isPending}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Quick Filter Buttons */}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={initialFilters.low_stock ? "default" : "outline"}
-                size="sm"
-                className="h-10 gap-2"
-                onClick={() =>
-                  handleFilterChange(
-                    "low_stock",
-                    !initialFilters.low_stock ? "true" : "",
-                  )
-                }
-                disabled={isPending}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <span className="hidden sm:inline">Sắp hết</span>
-              </Button>
-
-              {/* Bộ chuyển trạng thái */}
-              <Tabs
-                defaultValue={
-                  initialFilters.is_active === true
-                    ? "active"
-                    : initialFilters.is_active === false
-                      ? "inactive"
-                      : "all"
-                }
-                onValueChange={handleStatusChange}
-                className="w-auto"
-              >
-                <TabsList className="grid grid-cols-3 h-10">
-                  <TabsTrigger
-                    value="all"
-                    className="px-3 py-2"
-                    disabled={isPending}
-                  >
-                    Tất cả
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="active"
-                    className="px-3 py-2"
-                    disabled={isPending}
-                  >
-                    Đang bán
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="inactive"
-                    className="px-3 py-2"
-                    disabled={isPending}
-                  >
-                    Ngừng bán
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
-              <Button
-                variant={showCategoryFilter ? "default" : "outline"}
-                size="sm"
-                className="h-10 gap-2"
-                onClick={() => setShowCategoryFilter(!showCategoryFilter)}
-                disabled={isPending}
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Danh mục</span>
-              </Button>
-
+      <Card className={cn("border shadow-sm", isPending && "opacity-60")}>
+        <CardContent className="p-4 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium">Bộ lọc</h3>
               {totalActiveFilters > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetFilters}
-                  className="h-10 gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  disabled={isPending}
-                >
-                  <X className="h-4 w-4" />
-                  <span className="hidden sm:inline">Xóa lọc</span>
-                  <Badge variant="destructive" className="ml-1">
-                    {totalActiveFilters}
-                  </Badge>
-                </Button>
+                <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                  {totalActiveFilters}
+                </Badge>
               )}
             </div>
+
+            {totalActiveFilters > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                disabled={isPending}
+              >
+                <X className="h-3.5 w-3.5 mr-1" />
+                Xóa tất cả
+              </Button>
+            )}
           </div>
 
-          {/* Second Row: Category and Price Filters (when expanded) */}
-          {showCategoryFilter && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/50 animate-in fade-in slide-in-from-top-1 duration-200">
-              {/* Category Filter */}
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Tìm kiếm sản phẩm..."
+              value={searchValue}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchValue(value);
+                debouncedSearch(value);
+              }}
+              className="pl-8 h-9 text-sm"
+              disabled={isPending}
+            />
+            {searchValue && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchValue("");
+                  const query = createQueryString({ search: "" });
+                  pushWithTransition(`${pathname}?${query}`);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                disabled={isPending}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={initialFilters.low_stock ? "default" : "outline"}
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() =>
+                handleFilterChange(
+                  "low_stock",
+                  !initialFilters.low_stock ? "true" : "",
+                )
+              }
+              disabled={isPending}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              Sắp hết
+            </Button>
+
+            <Tabs
+              defaultValue={
+                initialFilters.is_active === true
+                  ? "active"
+                  : initialFilters.is_active === false
+                    ? "inactive"
+                    : "all"
+              }
+              onValueChange={handleStatusChange}
+              className="w-auto"
+            >
+              <TabsList className="h-8">
+                <TabsTrigger value="all" className="px-3 text-xs">
+                  Tất cả
+                </TabsTrigger>
+                <TabsTrigger value="active" className="px-3 text-xs">
+                  Đang bán
+                </TabsTrigger>
+                <TabsTrigger value="inactive" className="px-3 text-xs">
+                  Ngừng bán
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <Collapsible
+              open={showAdvancedFilters}
+              onOpenChange={setShowAdvancedFilters}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant={showAdvancedFilters ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  disabled={isPending}
+                >
+                  <span>Lọc nâng cao</span>
+                  {showAdvancedFilters ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+
+              <CollapsibleContent className="mt-3">
+                <div className="space-y-3 p-3 bg-muted/30 rounded-md border">
+                  {/* Categories */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">
+                      Danh mục
+                    </Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        variant={
+                          !initialFilters.category ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => handleFilterChange("category", "")}
+                        disabled={isPending}
+                        className="h-7 px-2 text-xs"
+                      >
+                        Tất cả
+                      </Button>
+                      {categories.map((cat) => (
+                        <Button
+                          key={cat}
+                          variant={
+                            initialFilters.category === cat
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                          onClick={() => handleFilterChange("category", cat)}
+                          disabled={isPending}
+                          className="h-7 px-2 text-xs"
+                        >
+                          {cat}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Price Range */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">
+                      Khoảng giá
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Từ"
+                        className="h-8 text-sm"
+                        min="0"
+                        step="1000"
+                        value={minPriceValue}
+                        onChange={(e) => handleMinPriceChange(e.target.value)}
+                        disabled={isPending}
+                      />
+                      <span className="text-muted-foreground">-</span>
+                      <Input
+                        type="number"
+                        placeholder="Đến"
+                        className="h-8 text-sm"
+                        min="0"
+                        step="1000"
+                        value={maxPriceValue}
+                        onChange={(e) => handleMaxPriceChange(e.target.value)}
+                        disabled={isPending}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+
+          {/* Active Filters Section - Hiển thị riêng biệt */}
+          {activeFilters.length > 0 && (
+            <>
+              <Separator className="my-1" />
+
               <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
-                  Danh mục sản phẩm
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={!initialFilters.category ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleFilterChange("category", "")}
-                    disabled={isPending}
-                  >
-                    Tất cả
-                  </Button>
-                  {categories.map((cat) => (
-                    <Button
-                      key={cat}
-                      variant={
-                        initialFilters.category === cat ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => handleFilterChange("category", cat)}
-                      disabled={isPending}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Điều kiện lọc hiện tại:
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {productCount} sản phẩm
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {activeFilters.map((filter) => (
+                    <Badge
+                      key={filter.key}
+                      variant="secondary"
+                      className="pl-2 pr-1 py-0.5 gap-1 text-xs font-normal group"
                     >
-                      {cat}
-                    </Button>
+                      <span>{filter.label}</span>
+                      <button
+                        onClick={() => removeFilter(filter.key)}
+                        className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
+                        disabled={isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
                   ))}
                 </div>
               </div>
-
-              {/* Price Filter */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Khoảng giá bán (VNĐ)
-                </Label>
-                <div className="flex gap-2 items-center">
-                  <div className="relative flex-1">
-                    <Input
-                      type="number"
-                      placeholder="Từ"
-                      className="h-9 pr-8"
-                      min="0"
-                      step="1000"
-                      value={minPriceValue}
-                      onChange={(e) => handleMinPriceChange(e.target.value)}
-                      disabled={isPending}
-                    />
-                    {minPriceValue && (
-                      <button
-                        type="button"
-                        onClick={() => handleMinPriceChange("")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        disabled={isPending}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                  <span className="text-muted-foreground">-</span>
-                  <div className="relative flex-1">
-                    <Input
-                      type="number"
-                      placeholder="Đến"
-                      className="h-9 pr-8"
-                      min="0"
-                      step="1000"
-                      value={maxPriceValue}
-                      onChange={(e) => handleMaxPriceChange(e.target.value)}
-                      disabled={isPending}
-                    />
-                    {maxPriceValue && (
-                      <button
-                        type="button"
-                        onClick={() => handleMaxPriceChange("")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        disabled={isPending}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            </>
           )}
 
-          {/* Result Count và Loading Indicator */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {isPending ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Đang tìm kiếm...
+          {/* Chỉ hiện separator và result count khi không có filters */}
+          {activeFilters.length === 0 && (
+            <>
+              <Separator className="my-1" />
+              <div className="flex items-center justify-end text-sm">
+                <span className="text-muted-foreground">
+                  {isPending ? (
+                    "Đang tìm..."
+                  ) : (
+                    <>
+                      <span className="font-medium text-foreground">
+                        {productCount}
+                      </span>{" "}
+                      sản phẩm
+                    </>
+                  )}
                 </span>
-              ) : (
-                <>
-                  Tìm thấy{" "}
-                  <span className="font-semibold text-foreground">
-                    {productCount}
-                  </span>{" "}
-                  sản phẩm
-                </>
-              )}
-            </span>
-
-            {/* Hiển thị filters đang active (chỉ khi có) */}
-            {totalActiveFilters > 0 && !isPending && (
-              <div className="flex flex-wrap gap-1">
-                {initialFilters.search && (
-                  <Badge variant="secondary" className="text-xs">
-                    Tìm: "{initialFilters.search}"
-                  </Badge>
-                )}
-                {initialFilters.category && (
-                  <Badge variant="secondary" className="text-xs">
-                    Danh mục: {initialFilters.category}
-                  </Badge>
-                )}
-                {initialFilters.low_stock && (
-                  <Badge variant="secondary" className="text-xs">
-                    Sắp hết hàng
-                  </Badge>
-                )}
-                {initialFilters.is_active === true && (
-                  <Badge variant="secondary" className="text-xs">
-                    Đang bán
-                  </Badge>
-                )}
-                {initialFilters.is_active === false && (
-                  <Badge variant="secondary" className="text-xs">
-                    Ngừng bán
-                  </Badge>
-                )}
-                {initialFilters.min_price && (
-                  <Badge variant="secondary" className="text-xs">
-                    Giá từ: {initialFilters.min_price.toLocaleString()}₫
-                  </Badge>
-                )}
-                {initialFilters.max_price && (
-                  <Badge variant="secondary" className="text-xs">
-                    Giá đến: {initialFilters.max_price.toLocaleString()}₫
-                  </Badge>
-                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </CardContent>
       </Card>
+
+      <style jsx>{`
+        @keyframes progress {
+          0% {
+            width: 0%;
+          }
+          50% {
+            width: 70%;
+          }
+          100% {
+            width: 100%;
+          }
+        }
+        .animate-progress {
+          animation: progress 2s ease-in-out infinite;
+        }
+      `}</style>
     </>
   );
 }

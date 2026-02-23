@@ -12,8 +12,8 @@ import { StatsCards } from "@/components/products/StatsCards";
 import { ProductActions } from "@/components/products/ProductActions";
 import { PaginationControl } from "@/components/products/PaginationControl";
 import ProductsLoading from "./loading";
-import { ProductFilters as ProductFiltersType } from "@/types"; // Import type
-import * as XLSX from "xlsx";
+import { ProductFilters as ProductFiltersType } from "@/types";
+
 interface ProductsPageProps {
   searchParams: Promise<{
     page?: string;
@@ -21,8 +21,8 @@ interface ProductsPageProps {
     category?: string;
     is_active?: string;
     low_stock?: string;
-    min_price?: string; // THÊM DÒNG NÀY
-    max_price?: string; // THÊM DÒNG NÀY
+    min_price?: string;
+    max_price?: string;
   }>;
 }
 
@@ -31,7 +31,6 @@ async function handleExportInPage(filters: ProductFiltersType) {
   "use server";
 
   try {
-    // 1. Lấy dữ liệu sản phẩm
     const productsResult = await getProductsForExport(filters);
 
     if (!productsResult.success || !productsResult.data) {
@@ -41,9 +40,7 @@ async function handleExportInPage(filters: ProductFiltersType) {
       };
     }
 
-    // 2. Tạo file Excel từ dữ liệu
     const excelResult = await generateExcelFromProducts(productsResult.data);
-
     return excelResult;
   } catch (error: any) {
     return { success: false, message: error.message };
@@ -55,7 +52,6 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
   const currentPage = Number(params.page) || 1;
   const pageSize = 10;
 
-  // Tạo filters object đúng kiểu dữ liệu
   const filters: ProductFiltersType = {
     search: params.search || "",
     category: params.category || "",
@@ -66,25 +62,9 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
           ? false
           : undefined,
     low_stock: params.low_stock === "true",
-    // QUAN TRỌNG: Parse giá từ string sang number
     min_price: params.min_price ? Number(params.min_price) : undefined,
     max_price: params.max_price ? Number(params.max_price) : undefined,
   };
-
-  // Debug để kiểm tra
-  console.log("Filters from URL:", filters);
-  console.log(
-    "min_price:",
-    filters.min_price,
-    "type:",
-    typeof filters.min_price,
-  );
-  console.log(
-    "max_price:",
-    filters.max_price,
-    "type:",
-    typeof filters.max_price,
-  );
 
   // Gọi API với phân trang
   const [{ products, totalCount }, categories, stats] = await Promise.all([
@@ -94,67 +74,58 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
   ]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header Section */}
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Quản lý kho thuốc
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Tra cứu và quản lý tồn kho dược phẩm
-            </p>
-          </div>
-          <ProductActions
-            filters={filters}
-            productCount={totalCount}
-            onExport={async () => {
-              "use server";
-              return await handleExportInPage(filters);
-            }}
-          />{" "}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Quản lý kho thuốc
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tra cứu và quản lý tồn kho dược phẩm
+          </p>
         </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="mb-2">
-        <StatsCards stats={stats} />
-      </div>
-
-      {/* Filters Section */}
-      <div className="mb-4">
-        <ProductFilters
-          categories={categories}
-          initialFilters={filters}
+        <ProductActions
+          filters={filters}
           productCount={totalCount}
+          onExport={async () => {
+            "use server";
+            return await handleExportInPage(filters);
+          }}
         />
       </div>
 
+      {/* Stats Cards */}
+      <StatsCards stats={stats} />
+
+      {/* Filters Section */}
+      <ProductFilters
+        categories={categories}
+        initialFilters={filters}
+        productCount={totalCount}
+      />
+
       {/* Products Table Section */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
         {/* Table Header */}
-        <div className="px-6 py-4 border-b bg-muted/30">
+        <div className="px-4 py-3 border-b bg-muted/20">
           <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold text-foreground">
-                Danh sách sản phẩm
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Tổng cộng {totalCount} sản phẩm • Trang {currentPage}
+            <div>
+              <h2 className="text-sm font-medium">Danh sách sản phẩm</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {totalCount} sản phẩm • Trang {currentPage}/
+                {Math.ceil(totalCount / pageSize)}
               </p>
             </div>
           </div>
         </div>
 
         {/* Table Content */}
-        <div className="overflow-hidden">
-          <ProductsTable products={products} />
-        </div>
+        <ProductsTable products={products} />
 
         {/* Pagination Footer */}
         {totalCount > pageSize && (
-          <div className="px-6 py-4 border-t bg-muted/20">
+          <div className="px-4 py-3 border-t bg-muted/10">
             <PaginationControl totalCount={totalCount} pageSize={pageSize} />
           </div>
         )}
