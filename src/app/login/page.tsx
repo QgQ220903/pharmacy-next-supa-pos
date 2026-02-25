@@ -255,11 +255,6 @@ export default function LoginPage() {
                   </span>
                 </div>
               </div>
-
-              <div className="text-xs text-center text-muted-foreground bg-muted/50 dark:bg-muted/30 rounded-lg p-3 border border-border/30">
-                <p>Email: admin@nhathuoc.com</p>
-                <p>Mật khẩu: 123456</p>
-              </div>
             </form>
           </CardContent>
 
