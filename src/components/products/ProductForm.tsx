@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { Product, ProductFormData, ProductUnit } from "@/types";
+import { Product, ProductUnit } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -23,22 +22,40 @@ import {
   Info,
   Calculator,
   ArrowLeftRight,
-  CheckCircle2,
   Plus,
-  MinusCircle,
+  Grip,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 import { updateProduct, createProduct } from "@/app/actions/products";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ProductFormProps {
   initialData?: Product & { units?: ProductUnit[] };
   categories?: string[];
+}
+
+// Danh sách gợi ý đơn vị phổ biến
+const COMMON_UNITS = [
+  "Viên", "Vỉ", "Hộp", "Chai", "Lọ", "Tuýp", "Bịch", "Gói", 
+  "Ống", "Miếng", "Túi", "Thùng", "Kg", "Gram", "Ml", "Lít"
+];
+
+// Interface cho dữ liệu gửi lên server (bao gồm cả units)
+interface ProductSubmitData {
+  internal_code: string;
+  barcode?: string | null;
+  name: string;
+  category?: string | null;
+  base_unit: string;
+  sale_price: number;
+  cost_price?: number | null;
+  min_stock: number;
+  manage_by_batch: boolean;
+  is_active: boolean;
+  units?: ProductUnit[];
 }
 
 export function ProductForm({ initialData, categories = [] }: ProductFormProps) {
@@ -46,27 +63,44 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const { register, handleSubmit, watch, setValue, control } = useForm<any>({
-    defaultValues: initialData
-      ? {
-        ...initialData,
-        barcode: initialData.barcode || "",
-        category: initialData.category || "",
-        cost_price: initialData.cost_price || 0,
-        max_stock: initialData.max_stock || 0,
-        notes: initialData.notes || "",
+  // Default values
+  const defaultValues = initialData ? {
+    internal_code: initialData.internal_code,
+    barcode: initialData.barcode || "",
+    name: initialData.name,
+    category: initialData.category || "",
+    base_unit: initialData.base_unit,
+    sale_price: initialData.sale_price,
+    cost_price: initialData.cost_price || 0,
+    min_stock: initialData.min_stock,
+    manage_by_batch: initialData.manage_by_batch ?? true,
+    is_active: initialData.is_active ?? true,
+    units: initialData.units && initialData.units.length > 0 ? initialData.units : [
+      { 
+        unit_name: initialData.base_unit, 
+        conversion_factor: 1, 
+        sale_price: initialData.sale_price, 
+        is_base_unit: true 
       }
-      : {
-        unit: "Viên",
-        sale_price: 0,
-        min_stock: 0,
-        is_active: true,
-        can_sell: true,
-        manage_by_batch: true,
-        units: [
-          { unit_name: "Viên", conversion_factor: 1, sale_price: 0, is_base_unit: true }
-        ]
-      },
+    ],
+  } : {
+    internal_code: "",
+    barcode: "",
+    name: "",
+    category: "",
+    base_unit: "",
+    sale_price: 0,
+    cost_price: 0,
+    min_stock: 10,
+    manage_by_batch: true,
+    is_active: true,
+    units: [
+      { unit_name: "", conversion_factor: 1, sale_price: 0, is_base_unit: true }
+    ]
+  };
+
+  const { register, handleSubmit, watch, setValue, control } = useForm<any>({
+    defaultValues,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -75,27 +109,30 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
   });
 
   const watchIsActive = watch("is_active");
-  const watchCanSell = watch("can_sell");
-  const watchMainUnit = watch("unit");
+  const watchBaseUnit = watch("base_unit");
   const watchManageByBatch = watch("manage_by_batch");
   const watchUnits = watch("units");
   const watchSalePrice = watch("sale_price");
 
   // Đồng bộ tên đơn vị chính với đơn vị cơ sở
   useEffect(() => {
-    setValue("units.0.unit_name", watchMainUnit);
-  }, [watchMainUnit, setValue]);
+    if (fields.length > 0 && watchBaseUnit) {
+      setValue("units.0.unit_name", watchBaseUnit);
+      setValue("units.0.is_base_unit", true);
+    }
+  }, [watchBaseUnit, setValue, fields.length]);
 
   // Đồng bộ giá bán chính với giá của đơn vị cơ sở
   useEffect(() => {
-    setValue("units.0.sale_price", watchSalePrice);
-  }, [watchSalePrice, setValue]);
+    if (fields.length > 0) {
+      setValue("units.0.sale_price", watchSalePrice);
+    }
+  }, [watchSalePrice, setValue, fields.length]);
 
   // Tự động tính giá cho các đơn vị dựa trên tỉ lệ quy đổi
   useEffect(() => {
-    if (watchSalePrice > 0) {
-      const units = watchUnits || [];
-      units.forEach((unit: any, index: number) => {
+    if (watchSalePrice > 0 && watchUnits) {
+      watchUnits.forEach((unit: any, index: number) => {
         if (index !== 0 && unit.conversion_factor > 0) {
           const calculatedPrice = watchSalePrice * unit.conversion_factor;
           setValue(`units.${index}.sale_price`, calculatedPrice);
@@ -108,8 +145,29 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
     const newErrors: Record<string, string> = {};
     if (!data.internal_code?.trim()) newErrors.internal_code = "Mã sản phẩm là bắt buộc";
     if (!data.name?.trim()) newErrors.name = "Tên sản phẩm là bắt buộc";
-    if (data.sale_price <= 0) newErrors.sale_price = "Giá bán phải lớn hơn 0";
-    if (data.units?.some((u: any) => !u.unit_name?.trim())) newErrors.units = "Tên đơn vị không được để trống";
+    if (!data.base_unit?.trim()) newErrors.base_unit = "Đơn vị cơ bản là bắt buộc";
+    if (data.sale_price < 0) newErrors.sale_price = "Giá bán không được âm";
+    if (data.min_stock < 0) newErrors.min_stock = "Tồn tối thiểu không được âm";
+    
+    // Validate đơn vị cơ bản
+    if (!data.units[0]?.unit_name?.trim()) {
+      newErrors.base_unit = "Đơn vị cơ bản phải có tên";
+    }
+    
+    // Validate các đơn vị quy đổi
+    if (data.units.length > 1) {
+      for (let i = 1; i < data.units.length; i++) {
+        const unit = data.units[i];
+        if (!unit.unit_name?.trim()) {
+          newErrors.units = "Tất cả đơn vị phải có tên";
+          break;
+        }
+        if (unit.conversion_factor <= 0) {
+          newErrors.units = "Tỉ lệ quy đổi phải lớn hơn 0";
+          break;
+        }
+      }
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -123,9 +181,29 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
 
     setIsSubmitting(true);
     try {
+      // Chuẩn bị dữ liệu gửi lên server
+      const submitData: ProductSubmitData = {
+        internal_code: data.internal_code,
+        barcode: data.barcode || null,
+        name: data.name,
+        category: data.category || null,
+        base_unit: data.base_unit,
+        sale_price: Number(data.sale_price),
+        cost_price: data.cost_price ? Number(data.cost_price) : null,
+        min_stock: Number(data.min_stock),
+        manage_by_batch: data.manage_by_batch,
+        is_active: data.is_active,
+        units: data.units.map((unit: any, index: number) => ({
+          unit_name: unit.unit_name,
+          conversion_factor: Number(unit.conversion_factor),
+          sale_price: Number(unit.sale_price),
+          is_base_unit: index === 0, // Đơn vị đầu tiên là base unit
+        })),
+      };
+
       const res = initialData
-        ? await updateProduct(initialData.id, data)
-        : await createProduct(data);
+        ? await updateProduct(initialData.id, submitData)
+        : await createProduct(submitData);
 
       if (res.success) {
         toast.success(initialData ? "Cập nhật thành công!" : "Thêm mới thành công!");
@@ -142,7 +220,9 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
   };
 
   const generateProductCode = () => {
-    setValue("internal_code", `SP${Date.now().toString().slice(-8)}`);
+    const prefix = "SP";
+    const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    setValue("internal_code", `${prefix}${randomNum}`);
   };
 
   const addDerivedUnit = () => {
@@ -155,45 +235,42 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {Object.keys(errors).length > 0 && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="py-3">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Vui lòng kiểm tra lại các trường thông tin bắt buộc.
+          <AlertDescription className="text-sm">
+            {errors.units || "Vui lòng kiểm tra lại các trường thông tin bắt buộc."}
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Layout chính - 2 cột cân đối */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Cột trái: Thông tin cơ bản */}
-        <div className="space-y-8">
-          {/* Card Thông tin sản phẩm */}
+      {/* Layout 2 cột */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cột trái */}
+        <div className="space-y-6">
+          {/* Thông tin cơ bản */}
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Thông tin sản phẩm
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                Thông tin cơ bản
               </CardTitle>
-              <CardDescription className="text-sm">
-                Nhập thông tin cơ bản của sản phẩm
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-3">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium">
-                      Mã sản phẩm <span className="text-destructive">*</span>
+                    <Label className="text-xs text-muted-foreground">
+                      Mã SP <span className="text-destructive">*</span>
                     </Label>
                     {!initialData && (
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         onClick={generateProductCode}
-                        className="h-7 text-xs"
+                        className="h-6 text-xs px-2"
                       >
                         <PlusCircle className="h-3 w-3 mr-1" />
                         Tạo mã
@@ -203,312 +280,270 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                   <Input
                     {...register("internal_code")}
                     disabled={!!initialData}
-                    placeholder="VD: PARA001"
-                    className={cn("h-10", errors.internal_code && "border-destructive")}
+                    placeholder="SP001"
+                    className={cn("h-9 text-sm", errors.internal_code && "border-destructive")}
                   />
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Mã vạch (Barcode)</Label>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Mã vạch</Label>
                   <Input
                     {...register("barcode")}
-                    placeholder="Quét hoặc nhập mã vạch..."
-                    className="h-10"
+                    placeholder="Nhập mã vạch"
+                    className="h-9 text-sm"
                   />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
                   Tên sản phẩm <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   {...register("name")}
-                  placeholder="Nhập tên đầy đủ của sản phẩm"
-                  className={cn("h-10", errors.name && "border-destructive")}
+                  placeholder="Nhập tên sản phẩm"
+                  className={cn("h-9 text-sm", errors.name && "border-destructive")}
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Tag className="h-4 w-4" />
-                    Danh mục
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      {...register("category")}
-                      list="category-options"
-                      placeholder="Chọn hoặc nhập..."
-                      className="h-10"
-                      autoComplete="off"
-                    />
-                    <datalist id="category-options">
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat} />
-                      ))}
-                    </datalist>
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Danh mục</Label>
+                  <Input
+                    {...register("category")}
+                    list="category-options"
+                    placeholder="Chọn hoặc nhập"
+                    className="h-9 text-sm"
+                  />
+                  <datalist id="category-options">
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <ArrowLeftRight className="h-4 w-4" />
-                    Đơn vị cơ bản
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Đơn vị cơ bản <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    {...register("unit")}
-                    placeholder="VD: Viên, Chai, Gói..."
-                    className="h-10"
+                    {...register("base_unit")}
+                    list="unit-options"
+                    placeholder="VD: Viên, Chai..."
+                    className={cn("h-9 text-sm", errors.base_unit && "border-destructive")}
                   />
+                  <datalist id="unit-options">
+                    {COMMON_UNITS.map((unit) => (
+                      <option key={unit} value={unit} />
+                    ))}
+                  </datalist>
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Ghi chú / Thành phần
-                </Label>
-                <Textarea
-                  {...register("notes")}
-                  placeholder="Thông tin thêm về sản phẩm..."
-                  className="min-h-[120px]"
-                />
               </div>
             </CardContent>
           </Card>
 
-          {/* Card Quản lý kho */}
+          {/* Giá vốn & Tồn kho */}
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Box className="h-5 w-5" />
-                Quản lý kho
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                Giá vốn & Tồn kho
               </CardTitle>
-              <CardDescription className="text-sm">
-                Cấu hình thông số tồn kho
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">
-                    Tồn tối thiểu
-                  </Label>
-                  <Input
-                    type="number"
-                    {...register("min_stock", { valueAsNumber: true })}
-                    className="h-10"
-                    min="0"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">
-                    Tồn tối đa
-                  </Label>
-                  <Input
-                    type="number"
-                    {...register("max_stock", { valueAsNumber: true })}
-                    className="h-10"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Giá nhập tham khảo
-                </Label>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Giá vốn tham khảo</Label>
                 <div className="relative">
                   <Input
                     type="number"
                     {...register("cost_price", { valueAsNumber: true })}
-                    className="h-10 pl-8"
+                    className="h-9 pl-7 text-sm"
                     min="0"
+                    step="1000"
                   />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">đ</span>
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    ₫
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Tồn tối thiểu <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    type="number"
+                    {...register("min_stock", { valueAsNumber: true })}
+                    className={cn("h-9 text-sm", errors.min_stock && "border-destructive")}
+                    min="0"
+                    step="1"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Trạng thái</Label>
+                  <div className="flex items-center h-9 px-3 border rounded-md bg-muted/20">
+                    <span className="text-sm text-muted-foreground">
+                      {watchIsActive ? "Đang bán" : "Ngừng bán"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Cột phải: Giá bán & Cài đặt */}
-        <div className="space-y-8">
-          {/* Card Giá bán & Quy đổi đơn vị */}
+        {/* Cột phải */}
+        <div className="space-y-6">
+          {/* Giá bán */}
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Giá bán & Quy đổi đơn vị
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-muted-foreground" />
+                Giá bán & Quy đổi
               </CardTitle>
-              <CardDescription className="text-sm">
-                Cấu hình giá bán theo các đơn vị tính khác nhau
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Giá bán cơ bản */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <Label className="text-sm font-semibold">Giá bán cơ bản</Label>
+              {/* Giá cơ bản */}
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Đơn vị cơ bản</Label>
+                  <Input
+                    value={watchBaseUnit || "Chưa nhập"}
+                    disabled
+                    className="h-10 text-base bg-muted/20"
+                  />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Đơn vị cơ bản</Label>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Giá bán cơ bản</Label>
+                  <div className="relative">
                     <Input
-                      {...register("unit")}
-                      placeholder="Viên"
-                      className="h-10"
+                      type="number"
+                      {...register("sale_price", { valueAsNumber: true })}
+                      className="h-10 pl-8 text-base font-medium"
+                      min="0"
+                      step="1000"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Giá bán</Label>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        {...register("sale_price", { valueAsNumber: true })}
-                        className="h-10 pl-8 font-medium"
-                        min="0"
-                      />
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">đ</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      đ/{watchMainUnit || "đơn vị"}
-                    </p>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      ₫
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <Separator />
-
-              {/* Các đơn vị quy đổi */}
-              {/* Các đơn vị quy đổi */}
+              {/* Đơn vị quy đổi */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label className="text-sm font-semibold flex items-center gap-2">
-                      <Calculator className="h-4 w-4" />
-                      Đơn vị quy đổi
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Thêm các đơn vị như Vỉ, Hộp để tự động tính giá
+                  <div>
+                    <Label className="text-sm font-medium">Đơn vị quy đổi</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Thêm các đơn vị như Vỉ, Hộp để bán lẻ
                     </p>
                   </div>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={addDerivedUnit}
-                    className="h-9 gap-2"
+                    className="gap-2 h-10"
                   >
                     <Plus className="h-4 w-4" />
                     Thêm đơn vị
                   </Button>
                 </div>
 
-                {/* Danh sách đơn vị quy đổi - Layout cải tiến */}
-                {fields.length > 1 && (
-                  <div className="space-y-3">
+                {fields.length > 1 ? (
+                  <div className="space-y-4">
                     {fields.slice(1).map((field, index) => {
                       const actualIndex = index + 1;
-                      const unit = watchUnits?.[actualIndex];
-
                       return (
-                        <div
-                          key={field.id}
-                          className="p-4 border rounded-lg bg-card/50"
-                        >
-                          <div className="grid grid-cols-12 gap-4 items-end">
-                            {/* Tên đơn vị - 4 cột */}
-                            <div className="col-span-12 md:col-span-4 space-y-2">
-                              <Label className="text-xs text-muted-foreground font-medium">
-                                Tên đơn vị
-                              </Label>
-                              <Input
-                                {...register(`units.${actualIndex}.unit_name`)}
-                                placeholder="VD: Vỉ, Hộp"
-                                className="h-10 text-sm"
-                              />
-                            </div>
-
-                            {/* Tỉ lệ quy đổi - 3 cột */}
-                            <div className="col-span-12 md:col-span-3 space-y-2">
-                              <Label className="text-xs text-muted-foreground font-medium">
-                                Tỉ lệ quy đổi
-                              </Label>
-                              <div className="flex items-center gap-2">
+                        <div key={field.id} className="p-4 border rounded-lg bg-card space-y-3">
+                          <div className="flex items-center gap-3">
+                            <Grip className="h-5 w-5 text-muted-foreground" />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+                              {/* Tên đơn vị */}
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  Tên đơn vị <span className="text-destructive">*</span>
+                                </Label>
                                 <Input
-                                  type="number"
-                                  {...register(`units.${actualIndex}.conversion_factor`, {
-                                    valueAsNumber: true,
-                                  })}
-                                  className="h-10 text-center font-medium"
-                                  min="1"
-                                  step="1"
+                                  {...register(`units.${actualIndex}.unit_name`)}
+                                  placeholder="VD: Vỉ, Hộp"
+                                  className="h-10 text-base"
                                 />
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                  {watchMainUnit}
-                                </span>
+                              </div>
+
+                              {/* Tỉ lệ quy đổi */}
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  Tỉ lệ quy đổi
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    {...register(`units.${actualIndex}.conversion_factor`, {
+                                      valueAsNumber: true,
+                                    })}
+                                    className="h-10 text-base text-center"
+                                    min="1"
+                                    step="1"
+                                  />
+                                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                    = 1 {watchBaseUnit || "đv"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Giá bán */}
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                  Giá bán
+                                </Label>
+                                <div className="relative">
+                                  <Input
+                                    type="number"
+                                    {...register(`units.${actualIndex}.sale_price`, {
+                                      valueAsNumber: true,
+                                    })}
+                                    className="h-10 pl-8 text-base font-semibold"
+                                    min="0"
+                                    step="1000"
+                                  />
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                                    ₫
+                                  </span>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Giá bán - 4 cột */}
-                            <div className="col-span-12 md:col-span-4 space-y-2">
-                              <Label className="text-xs text-muted-foreground font-medium">
-                                Giá bán
-                              </Label>
-                              <div className="relative">
-                                <Input
-                                  type="number"
-                                  {...register(`units.${actualIndex}.sale_price`, {
-                                    valueAsNumber: true,
-                                  })}
-                                  className="h-10 pl-8 pr-4 text-sm font-semibold"
-                                  min="0"
-                                  step="1000"
-                                />
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-foreground">
-                                  đ
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Nút xóa - 1 cột */}
-                            <div className="col-span-12 md:col-span-1 space-y-2">
-                              <div className="h-[18px]"></div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(actualIndex)}
-                                className="h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => remove(actualIndex)}
+                              className="h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
 
                           {/* Thông tin tự động tính */}
-                          {unit?.conversion_factor > 0 && watchSalePrice > 0 && (
-                            <div className="mt-3 pt-3 border-t border-border">
-                              <div className="flex items-center justify-between text-xs">
+                          {watchUnits?.[actualIndex]?.conversion_factor > 0 && watchSalePrice > 0 && (
+                            <div className="ml-12 mt-2 p-2 bg-muted/30 rounded-md border border-dashed">
+                              <div className="flex items-center justify-end gap-2 text-sm">
                                 <span className="text-muted-foreground">Tự động tính:</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">
-                                    {watchSalePrice?.toLocaleString()}đ
-                                  </span>
-                                  <span className="text-muted-foreground">×</span>
-                                  <span className="font-semibold">
-                                    {unit.conversion_factor}
-                                  </span>
-                                  <span className="text-muted-foreground">=</span>
-                                  <span className="font-bold text-green-600 dark:text-green-400">
-                                    {unit.sale_price?.toLocaleString()}đ
-                                  </span>
-                                </div>
+                                <span className="font-medium">
+                                  {watchSalePrice.toLocaleString()}đ
+                                </span>
+                                <span className="text-muted-foreground">×</span>
+                                <span className="font-semibold">
+                                  {watchUnits[actualIndex].conversion_factor}
+                                </span>
+                                <span className="text-muted-foreground">=</span>
+                                <span className="font-bold text-green-600 dark:text-green-400">
+                                  {(watchSalePrice * watchUnits[actualIndex].conversion_factor).toLocaleString()}đ
+                                </span>
                               </div>
                             </div>
                           )}
@@ -516,51 +551,14 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                       );
                     })}
                   </div>
-                )}
-
-                {/* Thông báo khi chưa có đơn vị quy đổi */}
-                {fields.length === 1 && (
-                  <div className="p-4 rounded-lg bg-muted/30 border">
-                    <div className="flex items-start gap-3">
-                      <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Chưa có đơn vị quy đổi</p>
-                        <p className="text-xs text-muted-foreground">
-                          Nhấn "Thêm đơn vị" để tạo các đơn vị tính khác. Hệ thống tự động tính giá dựa trên tỉ lệ quy đổi.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Ví dụ tính toán */}
-                {fields.length > 1 && watchSalePrice > 0 && (
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <div className="flex items-start gap-3">
-                      <Calculator className="h-5 w-5 text-primary" />
-                      <div className="space-y-3">
-                        <p className="text-sm font-medium">Ví dụ tính toán</p>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Giá bán cơ bản:</span>
-                            <span className="font-medium">{watchSalePrice?.toLocaleString()}đ/{watchMainUnit}</span>
-                          </div>
-                          {fields.slice(1).map((_, index) => {
-                            const actualIndex = index + 1;
-                            const unit = watchUnits?.[actualIndex];
-                            return (
-                              <div key={index} className="flex justify-between items-center">
-                                <div className="text-muted-foreground">
-                                  {unit?.conversion_factor || 1} {watchMainUnit} = 1 {unit?.unit_name || "đơn vị"}
-                                </div>
-                                <div className="font-semibold text-primary">
-                                  {unit?.sale_price?.toLocaleString()}đ
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                ) : (
+                  <div className="flex items-center gap-3 p-4 border-2 border-dashed rounded-lg bg-muted/5">
+                    <Info className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Chưa có đơn vị quy đổi</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Nhấn "Thêm đơn vị" để tạo các đơn vị tính khác
+                      </p>
                     </div>
                   </div>
                 )}
@@ -568,90 +566,41 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
             </CardContent>
           </Card>
 
-          {/* Card Cài đặt quản lý */}
+          {/* Cài đặt quản lý */}
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <Layers className="h-5 w-5" />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Layers className="h-4 w-4 text-muted-foreground" />
                 Cài đặt quản lý
               </CardTitle>
-              <CardDescription className="text-sm">
-                Cấu hình chế độ quản lý sản phẩm
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Quản lý theo lô hàng */}
-              <div className={cn(
-                "p-4 rounded-lg border transition-all",
-                watchManageByBatch
-                  ? "bg-violet-50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800"
-                  : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800"
-              )}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className={cn(
-                      "p-2 rounded-md",
-                      watchManageByBatch
-                        ? "bg-violet-100 dark:bg-violet-900/30"
-                        : "bg-blue-100 dark:bg-blue-900/30"
-                    )}>
-                      {watchManageByBatch ? (
-                        <Layers className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-                      ) : (
-                        <Box className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="font-semibold text-sm">
-                        Quản lý theo lô & hạn dùng
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {watchManageByBatch
-                          ? "Theo dõi từng lô nhập, xuất kho theo FEFO"
-                          : "Quản lý tồn kho tổng hợp"}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={watchManageByBatch}
-                    onCheckedChange={(val) => setValue("manage_by_batch", val)}
-                  />
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-md">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Quản lý theo lô & hạn dùng</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {watchManageByBatch 
+                      ? "Theo dõi từng lô nhập, xuất kho theo hạn dùng" 
+                      : "Quản lý tồn kho tổng hợp, không theo dõi lô"}
+                  </p>
                 </div>
+                <Switch
+                  checked={watchManageByBatch}
+                  onCheckedChange={(val) => setValue("manage_by_batch", val)}
+                />
               </div>
 
-              <Separator />
-
-              {/* Trạng thái kinh doanh */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">
-                      Đang kinh doanh
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {watchIsActive ? "Hiển thị tại quầy" : "Tạm ẩn khỏi quầy"}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={watchIsActive}
-                    onCheckedChange={(val) => setValue("is_active", val)}
-                  />
+              <div className="flex items-center justify-between p-4 border rounded-md">
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Trạng thái kinh doanh</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {watchIsActive ? "Đang bán tại quầy" : "Tạm ngừng bán, không hiển thị"}
+                  </p>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">
-                      Cho phép bán lẻ
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      {watchCanSell ? "Có thể bán trực tiếp" : "Chỉ quản lý kho"}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={watchCanSell}
-                    onCheckedChange={(val) => setValue("can_sell", val)}
-                  />
-                </div>
+                <Switch
+                  checked={watchIsActive}
+                  onCheckedChange={(val) => setValue("is_active", val)}
+                />
               </div>
             </CardContent>
           </Card>
@@ -659,46 +608,34 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
       </div>
 
       {/* Nút hành động */}
-      <div className="flex items-center justify-between pt-6 border-t">
+      <div className="flex items-center justify-end gap-3 pt-4 border-t">
         <Button
           type="button"
           variant="outline"
           onClick={() => router.back()}
           disabled={isSubmitting}
-          className="gap-2"
+          className="gap-2 h-10 px-4"
         >
           <ArrowLeftRight className="h-4 w-4 rotate-180" />
-          Quay lại
+          Hủy
         </Button>
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              // Reset form logic here
-            }}
-            disabled={isSubmitting}
-          >
-            Đặt lại
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="gap-2 min-w-[150px]"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Đang xử lý...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                {initialData ? "Cập nhật sản phẩm" : "Tạo sản phẩm"}
-              </>
-            )}
-          </Button>
-        </div>
+        <Button
+          type="submit"
+          disabled={isSubmitting}
+          className="gap-2 h-10 px-6"
+        >
+          {isSubmitting ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Đang xử lý...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              {initialData ? "Cập nhật sản phẩm" : "Tạo sản phẩm"}
+            </>
+          )}
+        </Button>
       </div>
     </form>
   );

@@ -12,11 +12,21 @@ import {
   Scale,
   Clock,
   Package,
+  DollarSign,
+  Tag,
+  Barcode,
+  Calendar,
+  FileText,
+  CheckCircle2,
+  XCircle,
+  Info,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatPrice, formatDate } from "@/lib/utils";
+import { formatPrice, formatDate, formatNumber, formatCompactNumber } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -27,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 
 export default async function ProductDetailPage({
   params,
@@ -44,68 +55,78 @@ export default async function ProductDetailPage({
   threeMonthsLater.setMonth(today.getMonth() + 3);
 
   const batches = product.product_batches || [];
-  const expiredBatches = batches.filter((b: any) => new Date(b.expiry_date) < today);
-  const nearExpiryBatches = batches.filter((b: any) => {
+  const expiredBatches = batches.filter((b) => new Date(b.expiry_date) < today);
+  const nearExpiryBatches = batches.filter((b) => {
     const exp = new Date(b.expiry_date);
     return exp >= today && exp <= threeMonthsLater;
   });
+  const validBatches = batches.filter((b) => new Date(b.expiry_date) > threeMonthsLater);
+
+  // Tính tổng giá trị tồn kho
+  const totalInventoryValue = (product.current_stock || 0) * (product.cost_price || 0);
+  
+  // Tính tỷ lệ tồn kho so với min_stock
+  const stockPercentage = product.min_stock > 0 
+    ? Math.min(100, Math.round(((product.current_stock || 0) / product.min_stock) * 100))
+    : 100;
+
+  // Lấy đơn vị cơ bản
+  const baseUnit = product.base_unit;
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-4">
-          <Button variant="ghost" size="icon" asChild className="rounded-lg shrink-0">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
             <Link href="/products">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-foreground">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Link href="/products" className="hover:text-primary">
+                Sản phẩm
+              </Link>
+              <span>/</span>
+              <span className="text-foreground">{product.name}</span>
+            </div>
+            <div className="flex items-center gap-3 mt-1">
+              <h1 className="text-2xl font-semibold tracking-tight">
                 {product.name}
               </h1>
               {!product.is_active && (
                 <Badge variant="secondary" className="text-xs">
+                  <XCircle className="h-3 w-3 mr-1" />
                   Ngừng kinh doanh
                 </Badge>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-              <p className="text-sm text-muted-foreground font-mono">
-                Mã: {product.internal_code}
-              </p>
-              {product.barcode && (
-                <p className="text-sm text-muted-foreground font-mono">
-                  Barcode: {product.barcode}
-                </p>
               )}
             </div>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild className="gap-2">
+          <Button variant="outline" size="sm" className="gap-2" asChild>
             <Link href={`/inventory/history/${id}`}>
               <History className="h-4 w-4" />
-              <span>Thẻ kho</span>
+              Lịch sử
             </Link>
           </Button>
-          <Button size="sm" asChild className="gap-2">
+          <Button size="sm" className="gap-2" asChild>
             <Link href={`/products/${id}/edit`}>
               <Edit className="h-4 w-4" />
-              <span>Chỉnh sửa</span>
+              Chỉnh sửa
             </Link>
           </Button>
         </div>
       </div>
 
       {/* Alert Badges */}
-      {expiredBatches.length > 0 || nearExpiryBatches.length > 0 || product.current_stock <= product.min_stock ? (
+      {(expiredBatches.length > 0 || nearExpiryBatches.length > 0 || (product.current_stock || 0) <= product.min_stock) && (
         <div className="flex flex-wrap gap-2">
-          {product.current_stock <= product.min_stock && (
+          {(product.current_stock || 0) <= product.min_stock && (
             <Badge variant="destructive" className="gap-2">
               <AlertTriangle className="h-3 w-3" />
-              Sắp hết hàng
+              Tồn kho thấp ({product.current_stock} / {product.min_stock} {baseUnit})
             </Badge>
           )}
           {expiredBatches.length > 0 && (
@@ -115,89 +136,143 @@ export default async function ProductDetailPage({
             </Badge>
           )}
           {nearExpiryBatches.length > 0 && (
-            <Badge variant="outline" className="gap-2 text-amber-600 border-amber-200">
+            <Badge variant="outline" className="gap-2 text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
               <Clock className="h-3 w-3" />
               {nearExpiryBatches.length} lô sắp hết hạn
             </Badge>
           )}
         </div>
-      ) : null}
+      )}
 
+      {/* Grid 3 cột */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column */}
+        {/* Cột trái - Thông tin cơ bản (2 cột) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Unit Conversion Table */}
+          {/* Thông tin cơ bản */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Scale className="h-4 w-4" />
-                <span>Quy đổi đơn vị & Giá bán</span>
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                Thông tin sản phẩm
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Mã sản phẩm</p>
+                  <p className="text-sm font-medium font-mono">{product.internal_code}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Barcode className="h-3 w-3" />
+                    Mã vạch
+                  </p>
+                  <p className="text-sm font-medium font-mono">{product.barcode || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    Danh mục
+                  </p>
+                  <p className="text-sm font-medium">{product.category || "Chưa phân loại"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Ngày tạo
+                  </p>
+                  <p className="text-sm font-medium">{formatDate(product.created_at)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Đơn vị tính & Giá bán */}
+          <Card>
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Scale className="h-4 w-4 text-muted-foreground" />
+                Đơn vị tính & Giá bán
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="pl-6">Đơn vị bán</TableHead>
-                    <TableHead>Tỷ lệ quy đổi</TableHead>
+                    <TableHead className="pl-4">Đơn vị</TableHead>
+                    <TableHead>Quy đổi</TableHead>
                     <TableHead>Giá bán</TableHead>
-                    <TableHead className="text-right pr-6">Tồn kho</TableHead>
+                    <TableHead className="text-right pr-4">Tồn kho quy đổi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* Main unit */}
-                  <TableRow>
-                    <TableCell className="pl-6 font-medium">
-                      {product.unit} (gốc)
+                  {/* Đơn vị cơ bản */}
+                  <TableRow className="bg-muted/20">
+                    <TableCell className="pl-4 font-medium">
+                      {baseUnit}
+                      <Badge variant="outline" className="ml-2 text-[10px] h-4 px-1">Gốc</Badge>
                     </TableCell>
                     <TableCell>1</TableCell>
-                    <TableCell className="font-semibold">
-                      {formatPrice(product.sale_price)}
-                    </TableCell>
-                    <TableCell className="text-right pr-6 font-semibold">
-                      {product.current_stock} {product.unit}
+                    <TableCell className="font-semibold text-primary">{formatPrice(product.sale_price)}</TableCell>
+                    <TableCell className="text-right pr-4 font-semibold">
+                      {formatNumber(product.current_stock || 0)} {baseUnit}
                     </TableCell>
                   </TableRow>
                   
-                  {/* Additional units */}
-                  {product.units?.map((u: any) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="pl-6">{u.unit_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        1 {u.unit_name} = {u.conversion_factor} {product.unit}
-                      </TableCell>
-                      <TableCell className="font-semibold">
-                        {formatPrice(u.sale_price)}
-                      </TableCell>
-                      <TableCell className="text-right pr-6">
-                        <span className="font-semibold">
-                          {Math.floor(product.current_stock / u.conversion_factor)}
-                        </span> {u.unit_name}
-                        {product.current_stock % u.conversion_factor > 0 && (
-                          <span className="text-xs text-muted-foreground ml-1">
-                            (+{product.current_stock % u.conversion_factor} {product.unit})
-                          </span>
-                        )}
+                  {/* Đơn vị quy đổi */}
+                  {product.units && product.units.length > 0 ? (
+                    product.units
+                      .filter((u) => !u.is_base_unit)
+                      .map((unit) => (
+                        <TableRow key={unit.id}>
+                          <TableCell className="pl-4">{unit.unit_name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            1 {unit.unit_name} = {unit.conversion_factor} {baseUnit}
+                          </TableCell>
+                          <TableCell className="font-medium">{formatPrice(unit.sale_price)}</TableCell>
+                          <TableCell className="text-right pr-4">
+                            {product.current_stock ? (
+                              <>
+                                <span className="font-medium">
+                                  {Math.floor(product.current_stock / unit.conversion_factor)}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  {unit.unit_name}
+                                </span>
+                                {product.current_stock % unit.conversion_factor > 0 && (
+                                  <div className="text-xs text-muted-foreground">
+                                    (dư {product.current_stock % unit.conversion_factor} {baseUnit})
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                        Không có đơn vị quy đổi
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
 
-          {/* Batch Details */}
+          {/* Chi tiết lô hàng */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
                 {product.manage_by_batch ? (
-                  <Layers className="h-4 w-4" />
+                  <Layers className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <Box className="h-4 w-4" />
+                  <Box className="h-4 w-4 text-muted-foreground" />
                 )}
-                <span>
-                  {product.manage_by_batch ? "Tồn kho theo lô" : "Quản lý tổng hợp"}
-                </span>
+                {product.manage_by_batch ? "Quản lý theo lô" : "Quản lý tổng hợp"}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -206,176 +281,259 @@ export default async function ProductDetailPage({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="pl-6">Số lô</TableHead>
+                        <TableHead className="pl-4">Số lô</TableHead>
                         <TableHead>Hạn sử dụng</TableHead>
-                        <TableHead className="text-center">Số lượng tồn</TableHead>
-                        <TableHead className="text-right pr-6">Trạng thái</TableHead>
+                        <TableHead className="text-right">Số lượng</TableHead>
+                        <TableHead className="text-right pr-4">Trạng thái</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {batches.map((batch: any) => {
-                        const isExpired = new Date(batch.expiry_date) < today;
-                        const isNearExpiry = !isExpired && new Date(batch.expiry_date) <= threeMonthsLater;
+                      {/* Lô hết hạn */}
+                      {expiredBatches.map((batch) => (
+                        <TableRow key={batch.id} className="bg-destructive/5">
+                          <TableCell className="pl-4 font-mono text-sm">{batch.batch_number}</TableCell>
+                          <TableCell className="text-destructive font-medium">
+                            {formatDate(batch.expiry_date)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatNumber(batch.quantity)} {baseUnit}
+                          </TableCell>
+                          <TableCell className="text-right pr-4">
+                            <Badge variant="destructive" className="text-xs">Hết hạn</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
 
-                        return (
-                          <TableRow key={batch.id}>
-                            <TableCell className="pl-6 font-medium font-mono">
-                              {batch.batch_number}
-                            </TableCell>
-                            <TableCell className={cn(
-                              "font-medium",
-                              isExpired && "text-destructive",
-                              isNearExpiry && "text-amber-600"
-                            )}>
-                              {formatDate(batch.expiry_date)}
-                            </TableCell>
-                            <TableCell className="text-center font-semibold">
-                              {batch.quantity} {product.unit}
-                            </TableCell>
-                            <TableCell className="text-right pr-6">
-                              <Badge
-                                variant={
-                                  isExpired
-                                    ? "destructive"
-                                    : isNearExpiry
-                                    ? "outline"
-                                    : "secondary"
-                                }
-                                className="text-xs"
-                              >
-                                {isExpired
-                                  ? "Hết hạn"
-                                  : isNearExpiry
-                                  ? "Sắp hết hạn"
-                                  : "An toàn"}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {/* Lô sắp hết hạn */}
+                      {nearExpiryBatches.map((batch) => (
+                        <TableRow key={batch.id} className="bg-amber-50/50 dark:bg-amber-950/10">
+                          <TableCell className="pl-4 font-mono text-sm">{batch.batch_number}</TableCell>
+                          <TableCell className="text-amber-600 dark:text-amber-400 font-medium">
+                            {formatDate(batch.expiry_date)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatNumber(batch.quantity)} {baseUnit}
+                          </TableCell>
+                          <TableCell className="text-right pr-4">
+                            <Badge variant="outline" className="border-amber-200 text-amber-700 dark:text-amber-400">
+                              Sắp hết hạn
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {/* Lô còn hạn */}
+                      {validBatches.map((batch) => (
+                        <TableRow key={batch.id}>
+                          <TableCell className="pl-4 font-mono text-sm">{batch.batch_number}</TableCell>
+                          <TableCell>{formatDate(batch.expiry_date)}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatNumber(batch.quantity)} {baseUnit}
+                          </TableCell>
+                          <TableCell className="text-right pr-4">
+                            <Badge variant="secondary" className="text-xs">Còn hạn</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="py-12 text-center space-y-4">
-                    <Package className="h-12 w-12 text-muted-foreground/50 mx-auto" />
-                    <div>
-                      <p className="font-medium">Chưa có thông tin lô hàng</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Tạo phiếu nhập kho để thêm lô hàng
-                      </p>
-                    </div>
+                  <div className="py-12 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+                    <p className="text-sm font-medium">Chưa có lô hàng</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Tạo phiếu nhập kho để thêm lô hàng
+                    </p>
                   </div>
                 )
               ) : (
-                <div className="py-8 text-center space-y-4">
-                  <div className="inline-flex p-3 rounded-lg bg-muted">
-                    <Box className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="space-y-2 max-w-sm mx-auto">
-                    <p className="font-medium">Quản lý tổng hợp</p>
-                    <p className="text-sm text-muted-foreground">
-                      Hệ thống quản lý tồn kho tổng hợp không theo dõi hạn sử dụng từng lô
-                    </p>
-                    <Button variant="link" size="sm" asChild className="mt-2">
-                      <Link href={`/inventory/history/${id}`}>
-                        Xem thẻ kho chi tiết
-                      </Link>
-                    </Button>
-                  </div>
+                <div className="py-8 text-center">
+                  <Box className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+                  <p className="text-sm font-medium">Quản lý tổng hợp</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                    Sản phẩm được quản lý tồn kho tổng hợp, không theo dõi theo lô
+                  </p>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column */}
+        {/* Cột phải - Thông tin tồn kho & giá trị */}
         <div className="space-y-6">
-          {/* Inventory Card */}
+          {/* Tồn kho hiện tại */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
-                Tồn kho
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Tồn kho hiện tại
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center space-y-2">
+            <CardContent className="pt-4">
+              <div className="text-center space-y-3">
                 <div className={cn(
                   "text-4xl font-bold",
-                  product.current_stock <= product.min_stock && "text-destructive"
+                  (product.current_stock || 0) <= product.min_stock && "text-destructive"
                 )}>
-                  {product.current_stock}
+                  {formatNumber(product.current_stock || 0)}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {product.unit}
+                  {baseUnit}
+                </div>
+                
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">So với tồn tối thiểu</span>
+                    <span className={cn(
+                      "font-medium",
+                      stockPercentage <= 100 ? "text-green-600" : "text-destructive"
+                    )}>
+                      {stockPercentage}%
+                    </span>
+                  </div>
+                  <Progress value={stockPercentage} className="h-2" />
                 </div>
               </div>
+
+              <Separator className="my-4" />
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Tồn tối thiểu</span>
+                  <span className="font-medium">{formatNumber(product.min_stock)} {baseUnit}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Tình trạng</span>
+                  <span className={cn(
+                    "font-medium",
+                    (product.current_stock || 0) <= product.min_stock 
+                      ? "text-destructive" 
+                      : "text-green-600"
+                  )}>
+                    {(product.current_stock || 0) <= product.min_stock 
+                      ? "Cần nhập thêm" 
+                      : "Đủ hàng"}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Giá trị tồn kho */}
+          <Card>
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Giá trị tồn kho
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Giá vốn</span>
+                <span className="font-medium">
+                  {product.cost_price ? formatPrice(product.cost_price) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Giá bán</span>
+                <span className="font-medium text-primary">{formatPrice(product.sale_price)}</span>
+              </div>
+              
+              {/* Lợi nhuận ước tính */}
+              {product.cost_price && product.cost_price > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Lợi nhuận</span>
+                  <span className="font-medium text-green-600">
+                    {formatPrice(product.sale_price - product.cost_price)}
+                    <span className="text-xs text-muted-foreground ml-1">
+                      ({Math.round(((product.sale_price - product.cost_price) / product.sale_price) * 100)}%)
+                    </span>
+                  </span>
+                </div>
+              )}
 
               <Separator />
 
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Tồn tối thiểu</span>
-                  <span className="font-medium">
-                    {product.min_stock} {product.unit}
-                  </span>
-                </div>
-                {product.max_stock && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Tồn tối đa</span>
-                    <span className="font-medium">
-                      {product.max_stock} {product.unit}
-                    </span>
-                  </div>
-                )}
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-sm font-medium">Tổng giá trị tồn</span>
+                <span className="text-lg font-bold text-primary">
+                  {formatCompactNumber(totalInventoryValue)}
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                * Tính theo giá vốn
+              </p>
             </CardContent>
           </Card>
 
-          {/* Product Info Card */}
+          {/* Thông tin bổ sung */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">
-                Thông tin sản phẩm
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                Thông tin khác
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Danh mục</span>
-                  <span className="font-medium">{product.category || "Chưa phân loại"}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Quản lý theo lô</span>
-                  <span className="font-medium">
-                    {product.manage_by_batch ? (
-                      <span className="flex items-center gap-1">
-                        <Layers className="h-3 w-3" />
-                        Có
-                      </span>
-                    ) : "Không"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Ngày tạo</span>
-                  <span className="font-medium">{formatDate(product.created_at)}</span>
-                </div>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Quản lý theo lô</span>
+                <span className="font-medium flex items-center gap-1">
+                  {product.manage_by_batch ? (
+                    <>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                      Có
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                      Không
+                    </>
+                  )}
+                </span>
               </div>
-
-              {product.notes && (
-                <>
-                  <Separator />
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">
-                      Ghi chú
-                    </p>
-                    <p className="text-sm leading-relaxed p-3 bg-muted/30 rounded-lg">
-                      {product.notes}
-                    </p>
-                  </div>
-                </>
-              )}
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Trạng thái</span>
+                <span className="font-medium">
+                  {product.is_active ? (
+                    <span className="text-green-600">Đang kinh doanh</span>
+                  ) : (
+                    <span className="text-muted-foreground">Ngừng kinh doanh</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Cập nhật lần cuối</span>
+                <span className="font-medium text-xs">{formatDate(product.updated_at)}</span>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Thống kê nhanh */}
+          {batches.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Thống kê lô hàng
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Còn hạn</p>
+                    <p className="text-lg font-semibold text-green-600">{validBatches.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Sắp hết</p>
+                    <p className="text-lg font-semibold text-amber-600">{nearExpiryBatches.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Hết hạn</p>
+                    <p className="text-lg font-semibold text-destructive">{expiredBatches.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

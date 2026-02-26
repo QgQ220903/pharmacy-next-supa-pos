@@ -20,9 +20,16 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  ShieldCheck,
   Moon,
   Sun,
+  Stethoscope,
+  Shield,
+  Key,
+  FileCheck,
+  Building,
+  BadgeCheck,
+  ScanLine,
+  Database,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -74,12 +81,12 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
-      {/* Animated Background Elements - Tự động thích ứng với theme */}
+      {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-[30%] -right-[10%] h-[500px] w-[500px] rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-transparent blur-3xl dark:from-primary/10 dark:via-primary/5" />
         <div className="absolute -bottom-[30%] -left-[10%] h-[500px] w-[500px] rounded-full bg-gradient-to-tr from-primary/15 via-primary/5 to-transparent blur-3xl dark:from-primary/10 dark:via-primary/5" />
 
-        {/* Medical Cross Pattern - Màu sắc tự động thích ứng */}
+        {/* Medical Cross Pattern */}
         <div
           className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03]"
           style={{
@@ -117,8 +124,8 @@ export default function LoginPage() {
           transition={{ delay: 0.2 }}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center p-3 bg-primary/10 rounded-2xl mb-4 ring-1 ring-primary/20 dark:ring-primary/30">
-            <ShieldCheck className="h-8 w-8 text-primary" />
+          <div className="inline-flex items-center justify-center p-3 bg-primary/10 rounded-xl mb-4">
+            <Stethoscope className="h-8 w-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             MedPOS
@@ -176,46 +183,36 @@ export default function LoginPage() {
                 transition={{ delay: 0.4 }}
                 className="space-y-2"
               >
-                <div className="flex justify-between items-center">
-                  <Label
-                    htmlFor="password"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Mật khẩu
-                  </Label>
-                  <Button
-                    variant="link"
-                    className="px-0 text-xs h-auto font-normal text-muted-foreground hover:text-primary transition-colors"
-                    type="button"
-                  >
-                    Quên mật khẩu?
-                  </Button>
-                </div>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Label
+                  htmlFor="password"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Mật khẩu
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••"
-                    className="pl-10 pr-10 h-11 bg-background/50 dark:bg-background/30 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30 transition-all duration-200"
+                    className="pl-10 pr-10 h-11 bg-background/50 dark:bg-background/30 border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30 transition-all duration-200 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 hover:bg-transparent text-muted-foreground hover:text-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none z-10"
                     onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
                     ) : (
                       <Eye className="h-4 w-4" />
                     )}
-                  </Button>
+                  </button>
                 </div>
               </motion.div>
 
@@ -243,31 +240,83 @@ export default function LoginPage() {
                   )}
                 </Button>
               </motion.div>
-
-              {/* Demo credentials hint */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-dashed border-border/50" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    Tài khoản demo
-                  </span>
-                </div>
-              </div>
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col space-y-3">
-            <p className="text-xs text-center text-muted-foreground">
-              Hệ thống quản lý nhà thuốc - Phiên bản 2.0
-            </p>
-            <div className="flex items-center justify-center space-x-2 text-xs text-muted-foreground/60">
-              <span>© 2024 MedPOS</span>
-              <span>•</span>
-              <span>Bảo mật & An toàn</span>
-              <span>•</span>
-              <span>v2.0.0</span>
+          <CardFooter className="flex flex-col space-y-4">
+            {/* Professional Trust Badges */}
+            <div className="grid grid-cols-3 gap-3 w-full pt-2">
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 bg-primary/5 rounded-md">
+                  <Building className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                  Bộ Y Tế
+                </span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 bg-primary/5 rounded-md">
+                  <BadgeCheck className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                  GPP Certified
+                </span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 bg-primary/5 rounded-md">
+                  <Shield className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                  AES-256
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 bg-primary/5 rounded-md">
+                  <ScanLine className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                  QR Code
+                </span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 bg-primary/5 rounded-md">
+                  <Database className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                  Cloud Sync
+                </span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="p-1.5 bg-primary/5 rounded-md">
+                  <Key className="h-3.5 w-3.5 text-primary/70" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground text-center leading-tight">
+                  2FA Ready
+                </span>
+              </div>
+            </div>
+
+            {/* Footer Info */}
+            <div className="w-full pt-3 border-t border-border/40">
+              <p className="text-xs text-center text-muted-foreground/70">
+                © 2024 MedPOS • Hệ thống quản lý nhà thuốc đạt chuẩn GPP
+              </p>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <div className="flex items-center gap-1">
+                  <div className="h-1 w-1 rounded-full bg-green-500" />
+                  <span className="text-[10px] text-muted-foreground/60">v3.0.0</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground/30">•</span>
+                <div className="flex items-center gap-1">
+                  <FileCheck className="h-2.5 w-2.5 text-muted-foreground/50" />
+                  <span className="text-[10px] text-muted-foreground/60">ISO 27001</span>
+                </div>
+              </div>
             </div>
           </CardFooter>
         </Card>
@@ -277,19 +326,19 @@ export default function LoginPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="flex justify-center gap-4 mt-6 text-xs text-muted-foreground"
+          className="flex justify-center gap-4 mt-6 text-xs text-muted-foreground/60"
         >
           <div className="flex items-center gap-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+            <Shield className="h-3 w-3" />
             <span>SSL Secure</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            <span>2FA Available</span>
+            <Shield className="h-3 w-3" />
+            <span>HIPAA Ready</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-            <span>HIPAA Ready</span>
+            <Shield className="h-3 w-3" />
+            <span>GDPR</span>
           </div>
         </motion.div>
       </motion.div>

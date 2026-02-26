@@ -26,7 +26,6 @@ interface ProductsPageProps {
   }>;
 }
 
-// Tạo function xử lý export trong page
 async function handleExportInPage(filters: ProductFiltersType) {
   "use server";
 
@@ -65,17 +64,20 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
     min_price: params.min_price ? Number(params.min_price) : undefined,
     max_price: params.max_price ? Number(params.max_price) : undefined,
   };
+  console.log("Fetching with filters:", filters); // Debug
 
-  // Gọi API với phân trang
+
   const [{ products, totalCount }, categories, stats] = await Promise.all([
-    getProducts(filters, currentPage),
+    getProducts(filters, currentPage, pageSize),
     getProductCategories(),
     getProductStats(),
   ]);
+  console.log("Products:", products?.length); // Debug
+  console.log("Categories:", categories?.length); // Debug
+  console.log("Stats:", stats); // Debug - Xem stats có dữ liệu không
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -95,19 +97,15 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
         />
       </div>
 
-      {/* Stats Cards */}
       <StatsCards stats={stats} />
 
-      {/* Filters Section */}
       <ProductFilters
         categories={categories}
         initialFilters={filters}
         productCount={totalCount}
       />
 
-      {/* Products Table Section */}
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
-        {/* Table Header */}
         <div className="px-4 py-3 border-b bg-muted/20">
           <div className="flex items-center justify-between">
             <div>
@@ -120,10 +118,8 @@ async function ProductsContent({ searchParams }: ProductsPageProps) {
           </div>
         </div>
 
-        {/* Table Content */}
         <ProductsTable products={products} />
 
-        {/* Pagination Footer */}
         {totalCount > pageSize && (
           <div className="px-4 py-3 border-t bg-muted/10">
             <PaginationControl totalCount={totalCount} pageSize={pageSize} />

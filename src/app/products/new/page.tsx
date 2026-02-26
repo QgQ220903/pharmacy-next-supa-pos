@@ -10,285 +10,231 @@ import {
   DollarSign,
   AlertCircle,
   FileText,
-  CheckCircle,
   Scale,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  CheckCircle2,
+  Lightbulb,
+  Gauge,
+  BadgePercent,
+  Boxes,
+  Barcode,
+  ScrollText,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 export default async function NewProductPage() {
   const categories = await getProductCategories();
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/products">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-foreground">
-            Thêm sản phẩm mới
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Thiết lập thông tin sản phẩm và cấu hình quản lý kho
-          </p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Header với breadcrumb */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+            <Link href="/products">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Link href="/products" className="hover:text-primary transition-colors">
+                Sản phẩm
+              </Link>
+              <span>/</span>
+              <span className="text-foreground">Thêm mới</span>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight mt-1">
+              Thêm sản phẩm mới
+            </h1>
+          </div>
         </div>
+        
+        {/* Badge trạng thái */}
+        <Badge variant="outline" className="w-fit gap-1 bg-primary/5 border-primary/20">
+          <Sparkles className="h-3 w-3 text-primary" />
+          <span>Form nhập liệu thông minh</span>
+        </Badge>
       </div>
 
-      {/* Workflow Guide - Moved to Top */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Hướng dẫn nhập liệu
+      {/* Progress Steps - Thiết kế lại đẹp hơn */}
+      <Card className="border-primary/10 overflow-hidden">
+        <div className="bg-gradient-to-r from-primary/5 via-transparent to-transparent p-6 pb-4">
+          <CardTitle className="text-base font-semibold flex items-center gap-2 mb-4">
+            <div className="p-1.5 rounded-md bg-primary/10 text-primary">
+              <FileText className="h-4 w-4" />
+            </div>
+            Quy trình nhập liệu
           </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-md bg-muted">
-                  <Package className="h-4 w-4" />
+          
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            {[
+              { icon: Package, label: "Thông tin cơ bản", desc: "Tên, mã SP, đơn vị" },
+              { icon: Tag, label: "Danh mục", desc: "Phân loại & barcode" },
+              { icon: DollarSign, label: "Giá bán", desc: "Định giá & quy đổi" },
+              { icon: Scale, label: "Tồn kho", desc: "Định mức tối thiểu" },
+              { icon: Layers, label: "Cấu hình", desc: "Quản lý lô/hạn" },
+            ].map((step, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <div className="relative">
+                  <div className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    "bg-muted/50 text-muted-foreground",
+                    "group-hover:bg-primary/10 group-hover:text-primary"
+                  )}>
+                    <step.icon className="h-3.5 w-3.5" />
+                  </div>
+                  {index < 4 && (
+                    <div className="hidden md:block absolute top-3 left-6 w-full h-[1px] bg-border" />
+                  )}
                 </div>
-                <span className="text-sm font-medium">1. Thông tin cơ bản</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Nhập tên, mã sản phẩm và đơn vị tính chính
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-md bg-muted">
-                  <Tag className="h-4 w-4" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium">{step.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{step.desc}</p>
                 </div>
-                <span className="text-sm font-medium">2. Danh mục & Barcode</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Chọn danh mục có sẵn hoặc nhập mới
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-md bg-muted">
-                  <DollarSign className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium">3. Giá bán & Quy đổi</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Thiết lập giá bán và tỷ lệ quy đổi đơn vị
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-md bg-muted">
-                  <Scale className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium">4. Tồn kho & Định mức</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Cài đặt mức tồn tối thiểu và tối đa
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-md bg-muted">
-                  <Layers className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium">5. Cấu hình quản lý</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Chọn chế độ quản lý lô hàng hoặc tổng hợp
-              </p>
-            </div>
+            ))}
           </div>
+        </div>
 
-          <Separator />
+        <Separator />
 
-          {/* Important Notes */}
-          <div className="p-4 rounded-lg bg-muted/50 space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm font-medium">Lưu ý quan trọng</span>
+        {/* Important Notes - Thiết kế gọn hơn */}
+        <div className="p-4 bg-amber-500/5 border-t border-amber-500/10">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 rounded-full bg-amber-500/10 shrink-0">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-foreground">Mã sản phẩm</p>
-                <p className="text-xs text-muted-foreground">
-                  Không thể thay đổi sau khi tạo. Có thể tự tạo mã hoặc nhập tay.
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-foreground">Tồn kho ban đầu</p>
-                <p className="text-xs text-muted-foreground">
-                  Luôn = 0 khi tạo mới. Cần nhập kho qua phiếu nhập để tăng tồn.
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-foreground">Quản lý theo lô</p>
-                <p className="text-xs text-muted-foreground">
-                  Dành cho thuốc có hạn dùng. Tổng hợp cho vật tư không hạn.
-                </p>
+            <div className="flex-1">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-2">
+                Những điều cần lưu ý:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-amber-500" />
+                  <span className="text-muted-foreground">Mã SP không thể thay đổi sau khi tạo</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-amber-500" />
+                  <span className="text-muted-foreground">Tồn kho ban đầu = 0 (cần nhập kho)</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-amber-500" />
+                  <span className="text-muted-foreground">Chọn quản lý theo lô cho thuốc có hạn</span>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+      </Card>
+
+      {/* Main Form Section */}
+      <Card>
+        <CardContent className="p-6">
+          <ProductForm categories={categories} />
         </CardContent>
       </Card>
 
-      {/* Main Form - Full Width with Info Cards */}
-      <div className="space-y-8">
-        <Card>
-          <CardContent className="p-8">
-            <ProductForm categories={categories} />
+      {/* Info Cards - Thiết kế lại gọn và đẹp hơn */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Pricing Card */}
+        <Card className="border-emerald-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <BadgePercent className="h-3.5 w-3.5" />
+              </div>
+              Giá bán & Quy đổi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground">Giá gốc:</span>
+                <Badge variant="outline" className="font-mono">5.000đ/viên</Badge>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground">Quy đổi:</span>
+                <Badge variant="outline" className="font-mono">1 vỉ = 10 viên</Badge>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-medium">Giá bán lẻ:</span>
+                <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-mono">
+                  50.000đ/vỉ
+                </Badge>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Informational Cards - Below the Form */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Pricing & Unit Conversion */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Giá bán & Quy đổi đơn vị
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="p-3 rounded-lg border bg-emerald-100 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
-                  <Badge variant="outline" className="mb-2 bg-emerald-200 dark:bg-emerald-900 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200">
-                    Giá bán chính
-                  </Badge>
-                  <p className="text-xs text-muted-foreground">
-                    Giá bán cho đơn vị tính gốc (1 viên, 1 chai)
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-lg border bg-blue-100 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                  <Badge variant="outline" className="mb-2 bg-blue-200 dark:bg-blue-900 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200">
-                    Quy đổi tự động
-                  </Badge>
-                  <p className="text-xs text-muted-foreground">
-                    Hệ thống tính giá các đơn vị khác dựa trên tỷ lệ quy đổi
-                  </p>
-                </div>
+        {/* Management Card */}
+        <Card className="border-violet-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                <Boxes className="h-3.5 w-3.5" />
               </div>
+              Chế độ quản lý
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Badge variant="outline" className="w-full justify-start gap-1.5 text-xs">
+                <Layers className="h-3 w-3 text-violet-500" />
+                Theo lô hàng (FEFO)
+              </Badge>
+              <Badge variant="outline" className="w-full justify-start gap-1.5 text-xs">
+                <Package className="h-3 w-3 text-sky-500" />
+                Tổng hợp (không hạn)
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-              <Separator />
-
-              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 space-y-3">
-                <div className="flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-foreground">Ví dụ tính toán</span>
-                </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Giá bán chính:</span>
-                    <span className="font-medium text-foreground">5.000đ/viên</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Quy đổi:</span>
-                    <span className="font-medium text-foreground">1 vỉ = 10 viên</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-primary/20">
-                    <span className="text-primary">Giá bán lẻ:</span>
-                    <span className="font-bold text-primary">50.000đ/vỉ</span>
-                  </div>
-                </div>
+        {/* Tips Card */}
+        <Card className="border-blue-500/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <Lightbulb className="h-3.5 w-3.5" />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Management Mode */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Chế độ quản lý
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="p-3 rounded-lg border bg-violet-500/10 border-violet-500/30">
-                  <Badge variant="outline" className="mb-2 bg-violet-500/20 border-violet-500/40 text-violet-700 dark:text-violet-300">
-                    Theo lô hàng
-                  </Badge>
-                  <p className="text-xs text-muted-foreground">
-                    Dành cho thuốc có hạn dùng. Theo dõi từng lô, xuất theo FEFO (hết hạn trước xuất trước).
-                  </p>
-                </div>
-
-                <div className="p-3 rounded-lg border bg-sky-500/10 border-sky-500/30">
-                  <Badge variant="outline" className="mb-2 bg-sky-500/20 border-sky-500/40 text-sky-700 dark:text-sky-300">
-                    Tổng hợp
-                  </Badge>
-                  <p className="text-xs text-muted-foreground">
-                    Dành cho vật tư không hạn. Quản lý tồn tổng, không theo dõi từng lô.
-                  </p>
-                </div>
+              Mẹo hữu ích
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <Barcode className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Quét barcode để bán nhanh</span>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Help Tips */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Info className="h-4 w-4" />
-                Mẹo hữu ích
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-md bg-muted">
-                    <span className="text-xs font-bold">1</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Sử dụng barcode</p>
-                    <p className="text-xs text-muted-foreground">
-                      Quét barcode giúp bán hàng nhanh chóng, chính xác
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-md bg-muted">
-                    <span className="text-xs font-bold">2</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Danh mục thông minh</p>
-                    <p className="text-xs text-muted-foreground">
-                      Hệ thống tự động ghi nhớ danh mục mới cho lần sau
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 rounded-md bg-muted">
-                    <span className="text-xs font-bold">3</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Định mức tồn kho</p>
-                    <p className="text-xs text-muted-foreground">
-                      Thiết lập tồn tối thiểu để nhận cảnh báo nhập hàng kịp thời
-                    </p>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2">
+                <ScrollText className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Hệ thống tự động lưu danh mục mới</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="flex items-center gap-2">
+                <Gauge className="h-3 w-3 text-muted-foreground" />
+                <span className="text-muted-foreground">Cảnh báo khi tồn dưới định mức</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Floating shortcut (optional) */}
+      <div className="fixed bottom-6 right-6">
+        <Button size="sm" className="shadow-lg gap-2" asChild>
+          <Link href="/products">
+            <Package className="h-4 w-4" />
+            Xem danh sách
+          </Link>
+        </Button>
       </div>
     </div>
   );
 }
+
