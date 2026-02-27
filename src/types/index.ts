@@ -1,19 +1,19 @@
+// types/index.ts
 export interface Product {
   id: string;
   internal_code: string;
-  barcode?: string | null;
+  barcode?: string | null;  // Giữ nguyên
   name: string;
-  category?: string | null;
-  base_unit: string;  // Đổi từ unit thành base_unit
+  category?: string | null;  // Giữ nguyên
+  base_unit: string;
   sale_price: number;
-  cost_price?: number | null;
+  cost_price?: number | null;  // Giữ nguyên
   min_stock: number;
   manage_by_batch: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  // Các trường tính toán hoặc từ join
-  current_stock?: number;  // Tính từ tổng các lô
+  current_stock?: number;
   units?: ProductUnit[];
   product_batches?: ProductBatch[];
 }
@@ -108,6 +108,17 @@ export interface StockEntryWithItems extends StockEntry {
   items: StockEntryItem[];
 }
 
+export interface StockEntryDetail extends StockEntry {
+  items: (StockEntryItem & {
+    products: {
+      id: string;
+      name: string;
+      internal_code: string;
+      base_unit: string;
+      manage_by_batch: boolean;
+    }
+  })[];
+}
 export interface Sale {
   id: string;
   sale_code: string;
@@ -148,4 +159,55 @@ export interface PaginatedResponse<T> {
   currentPage: number;
   totalPages: number;
   message?: string;
+}
+
+export interface ActionResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  totalCount?: number;
+  currentPage?: number;
+  totalPages?: number;
+}
+
+
+export type TransactionType = 
+  | 'IMPORT'           // Nhập kho
+  | 'EXPORT'           // Xuất kho (bán hàng)
+  | 'RETURN'           // Trả hàng
+  | 'ADJUSTMENT'       // Điều chỉnh
+  | 'CANCEL_IMPORT';   // Hủy phiếu nhập
+
+
+export interface BatchImport {
+  product_id: string;
+  batch_number: string;
+  expiry_date: string;
+  quantity: number;
+  cost_price: number;  // Giá nhập thực tế
+}
+
+export interface StockEntryImportData {
+  entry_code: string;
+  entry_date: string;
+  supplier_name?: string | null;
+  notes?: string | null;
+  items: {
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    batch_number?: string | null;
+    expiry_date?: string | null;
+  }[];
+}
+
+export interface StockEntryFilters {
+  page?: number;
+  limit?: number;
+  search?: string;      // Tìm theo mã phiếu, nhà cung cấp
+  fromDate?: string;     // Lọc từ ngày
+  toDate?: string;       // Lọc đến ngày
+  supplier?: string;     // Lọc theo nhà cung cấp
+  minAmount?: number;    // Lọc theo tổng tiền
+  maxAmount?: number;
 }

@@ -111,7 +111,6 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
   const watchIsActive = watch("is_active");
   const watchBaseUnit = watch("base_unit");
   const watchManageByBatch = watch("manage_by_batch");
-  const watchUnits = watch("units");
   const watchSalePrice = watch("sale_price");
 
   // Đồng bộ tên đơn vị chính với đơn vị cơ sở
@@ -129,17 +128,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
     }
   }, [watchSalePrice, setValue, fields.length]);
 
-  // Tự động tính giá cho các đơn vị dựa trên tỉ lệ quy đổi
-  useEffect(() => {
-    if (watchSalePrice > 0 && watchUnits) {
-      watchUnits.forEach((unit: any, index: number) => {
-        if (index !== 0 && unit.conversion_factor > 0) {
-          const calculatedPrice = watchSalePrice * unit.conversion_factor;
-          setValue(`units.${index}.sale_price`, calculatedPrice);
-        }
-      });
-    }
-  }, [watchSalePrice, watchUnits, setValue]);
+  // ĐÃ XÓA: Tự động tính giá cho các đơn vị dựa trên tỉ lệ quy đổi
 
   const validateForm = (data: any): boolean => {
     const newErrors: Record<string, string> = {};
@@ -181,7 +170,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
 
     setIsSubmitting(true);
     try {
-      // Chuẩn bị dữ liệu gửi lên server
+      // Chuẩn bị dữ liệu gửi lên server (bao gồm cả units)
       const submitData: ProductSubmitData = {
         internal_code: data.internal_code,
         barcode: data.barcode || null,
@@ -229,7 +218,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
     append({
       unit_name: "",
       conversion_factor: 1,
-      sale_price: watchSalePrice || 0,
+      sale_price: 0, // Không tự động lấy từ watchSalePrice nữa
       is_base_unit: false
     });
   };
@@ -506,7 +495,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                                     {...register(`units.${actualIndex}.sale_price`, {
                                       valueAsNumber: true,
                                     })}
-                                    className="h-10 pl-8 text-base font-semibold"
+                                    className="h-10 pl-8 text-base"
                                     min="0"
                                     step="1000"
                                   />
@@ -528,25 +517,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                             </Button>
                           </div>
 
-                          {/* Thông tin tự động tính */}
-                          {watchUnits?.[actualIndex]?.conversion_factor > 0 && watchSalePrice > 0 && (
-                            <div className="ml-12 mt-2 p-2 bg-muted/30 rounded-md border border-dashed">
-                              <div className="flex items-center justify-end gap-2 text-sm">
-                                <span className="text-muted-foreground">Tự động tính:</span>
-                                <span className="font-medium">
-                                  {watchSalePrice.toLocaleString()}đ
-                                </span>
-                                <span className="text-muted-foreground">×</span>
-                                <span className="font-semibold">
-                                  {watchUnits[actualIndex].conversion_factor}
-                                </span>
-                                <span className="text-muted-foreground">=</span>
-                                <span className="font-bold text-green-600 dark:text-green-400">
-                                  {(watchSalePrice * watchUnits[actualIndex].conversion_factor).toLocaleString()}đ
-                                </span>
-                              </div>
-                            </div>
-                          )}
+                          {/* ĐÃ XÓA: Phần thông tin tự động tính */}
                         </div>
                       );
                     })}

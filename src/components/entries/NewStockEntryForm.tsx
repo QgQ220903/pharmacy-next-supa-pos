@@ -1,4 +1,6 @@
+// components/entries/NewStockEntryForm.tsx
 "use client";
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ProductSearch } from "@/components/products/ProductSearch";
@@ -41,14 +43,17 @@ import {
   ShoppingCart,
   Tag,
   Search,
+  AlertCircle,
+  ArrowLeftRight,
 } from "lucide-react";
-import { createStockEntryAction } from "@/app/actions/inventory";
+import { createStockEntryAction, getPopularProducts } from "@/app/actions/inventory";
 import { toast } from "sonner";
 import { Product } from "@/types";
 import { Separator } from "@/components/ui/separator";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import LabelPrinter from "@/components/entries/LabelPrinter";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function NewStockEntryForm({
   products = [],
@@ -60,14 +65,27 @@ export default function NewStockEntryForm({
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [entryDate] = useState(new Date().toISOString().split("T")[0]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showQuickProducts, setShowQuickProducts] = useState(true);
+  const [popularProducts, setPopularProducts] = useState<Product[]>([]);
 
   const [printData, setPrintData] = useState<any[]>([]);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [entryCode] = useState(`PN${Date.now().toString().slice(-8)}`);
 
   const supplierInputRef = useRef<HTMLInputElement>(null);
+
+  const entryDate = new Date().toISOString().split("T")[0];
+
+  // Load popular products
+  useEffect(() => {
+    async function loadPopularProducts() {
+      const result = await getPopularProducts(8);
+      if (result.success) {
+        setPopularProducts(result.data);
+      }
+    }
+    loadPopularProducts();
+  }, []);
 
   useEffect(() => {
     if (supplierInputRef.current) {
@@ -84,7 +102,7 @@ export default function NewStockEntryForm({
       {
         product_id: p.id,
         name: p.name,
-        unit: p.unit,
+        unit: p.base_unit,
         quantity: 1,
         unit_price: p.cost_price || 0,
         sale_price: p.sale_price || 0,
@@ -93,12 +111,40 @@ export default function NewStockEntryForm({
         expiry_date: "",
       },
     ]);
+    setErrors({});
   };
 
   const updateItem = (index: number, key: string, val: any) => {
     const newItems = [...items];
-    newItems[index][key] = val;
+    
+    // Xử lý đặc biệt cho số
+    if (key === 'quantity' || key === 'unit_price') {
+      // Nếu giá trị rỗng, gán 0
+      if (val === '' || val === null || val === undefined) {
+        newItems[index][key] = 0;
+      } else {
+        // Chỉ giữ lại các ký tự số
+        const numericValue = val.toString().replace(/[^\d]/g, '');
+        // Parse thành số nguyên
+        const parsed = parseInt(numericValue, 10);
+        // Nếu là số hợp lệ và không âm, gán giá trị
+        if (!isNaN(parsed) && parsed >= 0) {
+          newItems[index][key] = parsed;
+        }
+        // Nếu không hợp lệ, giữ nguyên
+      }
+    } else {
+      newItems[index][key] = val;
+    }
+    
     setItems(newItems);
+    
+    // Xóa lỗi liên quan khi người dùng sửa
+    if (errors[`item_${index}_${key}`]) {
+      const newErrors = { ...errors };
+      delete newErrors[`item_${index}_${key}`];
+      setErrors(newErrors);
+    }
   };
 
   const removeItem = (index: number) => {
@@ -106,58 +152,87 @@ export default function NewStockEntryForm({
   };
 
   const totalAmount = items.reduce(
-    (sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0),
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0),
     0,
   );
 
-  const itemCount = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const itemCount = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
-  const handleSave = async () => {
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
     if (!supplier.trim()) {
-      toast.error("Vui lòng nhập tên nhà cung cấp");
-      return;
+      newErrors.supplier = "Vui lòng nhập tên nhà cung cấp";
     }
 
     if (items.length === 0) {
-      toast.error("Vui lòng thêm ít nhất 1 sản phẩm");
-      return;
+      newErrors.items = "Vui lòng thêm ít nhất 1 sản phẩm";
     }
 
-    for (const item of items) {
-      if (item.quantity <= 0 || item.quantity === "") {
-        toast.error(`Sản phẩm "${item.name}" có số lượng không hợp lệ`);
-        return;
+    items.forEach((item, index) => {
+      // Kiểm tra số lượng
+      if (item.quantity === undefined || item.quantity === null || item.quantity === '') {
+        newErrors[`item_${index}_quantity`] = "Vui lòng nhập số lượng";
+      } else {
+        const quantity = Number(item.quantity);
+        if (isNaN(quantity) || quantity <= 0) {
+          newErrors[`item_${index}_quantity`] = "Số lượng phải lớn hơn 0";
+        }
       }
+
+      // Kiểm tra đơn giá
+      if (item.unit_price === undefined || item.unit_price === null || item.unit_price === '') {
+        newErrors[`item_${index}_price`] = "Vui lòng nhập đơn giá";
+      } else {
+        const price = Number(item.unit_price);
+        if (isNaN(price) || price < 0) {
+          newErrors[`item_${index}_price`] = "Giá nhập không hợp lệ";
+        }
+      }
+
+      // Kiểm tra lô và hạn dùng
       if (item.manage_by_batch) {
         if (!item.batch_number?.trim()) {
-          toast.error(`Sản phẩm "${item.name}" yêu cầu số lô`);
-          return;
+          newErrors[`item_${index}_batch`] = "Vui lòng nhập số lô";
         }
         if (!item.expiry_date) {
-          toast.error(`Sản phẩm "${item.name}" yêu cầu hạn dùng`);
-          return;
+          newErrors[`item_${index}_expiry`] = "Vui lòng chọn hạn dùng";
+        } else {
+          // Kiểm tra hạn dùng phải lớn hơn ngày hiện tại
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const expiryDate = new Date(item.expiry_date);
+          if (expiryDate <= today) {
+            newErrors[`item_${index}_expiry`] = "Hạn dùng phải là ngày trong tương lai";
+          }
         }
       }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) {
+      toast.error("Vui lòng kiểm tra lại thông tin");
+      return;
     }
 
     setLoading(true);
     try {
+      // Chuẩn bị dữ liệu gửi lên server
+      const itemsData = items.map((item) => ({
+        product_id: item.product_id,
+        quantity: Number(item.quantity) || 0,
+        unit_price: Number(item.unit_price) || 0,
+        batch_number: item.batch_number?.trim() || null,
+        expiry_date: item.expiry_date || null,
+      }));
+
       const result = await createStockEntryAction({
-        supplier,
-        notes,
-        total_amount: totalAmount,
-        items: items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          batch_number: item.batch_number || null,
-          expiry_date: item.expiry_date || null,
-          product_name: item.name,
-          unit_name: item.unit,
-          sale_price: item.sale_price,
-        })),
-        entry_code: entryCode,
-        entry_date: entryDate,
+        supplier_name: supplier.trim(),
+        items: itemsData,
       });
 
       if (result.success) {
@@ -193,12 +268,6 @@ export default function NewStockEntryForm({
               </div>
               <div className="space-y-3">
                 <h2 className="text-2xl font-bold">Nhập hàng hoàn tất!</h2>
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 rounded-full">
-                  <Receipt className="h-4 w-4 text-green-600" />
-                  <span className="font-mono font-semibold text-green-700">
-                    {entryCode}
-                  </span>
-                </div>
                 <p className="text-muted-foreground max-w-lg mx-auto">
                   Phiếu nhập đã được lưu thành công. Bạn có thể in tem dán sản
                   phẩm ngay bây giờ.
@@ -252,69 +321,151 @@ export default function NewStockEntryForm({
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ClipboardList className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold">Tạo phiếu nhập mới</h2>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
-                  <span className="font-mono bg-muted px-2 py-1 rounded">
-                    {entryCode}
-                  </span>
+    <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-6">
+      {/* Hiển thị lỗi tổng thể */}
+      {Object.keys(errors).length > 0 && (
+        <Alert variant="destructive" className="py-3">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            {errors.items || "Vui lòng kiểm tra lại thông tin phiếu nhập"}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Layout 2 cột */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cột trái - Thông tin đối tác */}
+        <div className="space-y-6">
+          {/* Thông tin nhà cung cấp */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Thông tin đối tác
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Nhà cung cấp <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  ref={supplierInputRef}
+                  placeholder="Nhập tên nhà cung cấp..."
+                  value={supplier}
+                  onChange={(e) => setSupplier(e.target.value)}
+                  className={errors.supplier ? "border-destructive" : ""}
+                />
+                {errors.supplier && (
+                  <p className="text-xs text-destructive">{errors.supplier}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">
+                  Ghi chú
+                </Label>
+                <Textarea
+                  placeholder="Ghi chú về đơn hàng..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={4}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Thông tin phiếu */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Thông tin phiếu
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Ngày nhập
+                  </Label>
+                  <div className="flex items-center h-9 px-3 border rounded-md bg-muted/20">
+                    <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span className="text-sm">{formatDate(entryDate)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  <span>{entryDate}</span>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">
+                    Mã phiếu
+                  </Label>
+                  <div className="flex items-center h-9 px-3 border rounded-md bg-muted/20">
+                    <Tag className="h-4 w-4 text-muted-foreground mr-2" />
+                    <span className="text-sm font-mono text-muted-foreground">
+                      (Tự động)
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm text-muted-foreground">Tổng tiền hàng</p>
-            <p className="text-2xl font-bold text-primary">
-              {formatPrice(totalAmount)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="space-y-6">
-        {/* Product Search Section */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5 text-primary" />
-                Tìm kiếm và thêm sản phẩm
-              </CardTitle>
-              <Badge variant="outline" className="gap-1">
-                <Package className="h-3 w-3" />
-                {products.length} sản phẩm có sẵn
-              </Badge>
-            </div>
-            <CardDescription>
-              Tìm kiếm sản phẩm từ danh mục để thêm vào phiếu nhập
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <ProductSearch products={products} onSelect={addItem} />
-
-              {showQuickProducts && products.length > 0 && (
-                <>
+              {/* Thống kê nhanh */}
+              <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-4 mt-2">
+                <p className="text-xs font-medium text-muted-foreground mb-3">
+                  Thống kê nhanh
+                </p>
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Package className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Số lượng tổng
+                        </p>
+                        <p className="font-bold">{itemCount}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <DollarSign className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          Tổng tiền
+                        </p>
+                        <p className="font-bold text-primary">
+                          {formatPrice(totalAmount)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Cột phải - Danh sách sản phẩm */}
+        <div className="space-y-6">
+          {/* Tìm kiếm sản phẩm */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                Thêm sản phẩm
+              </CardTitle>
+              <CardDescription>
+                Tìm kiếm và chọn sản phẩm để thêm vào phiếu nhập
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProductSearch products={popularProducts} onSelect={addItem} />
+
+              {showQuickProducts && popularProducts.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-xs text-muted-foreground">
                       Sản phẩm thường dùng
                     </Label>
                     <Button
@@ -326,10 +477,11 @@ export default function NewStockEntryForm({
                       Ẩn
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {products.slice(0, 4).map((product) => (
+                  <div className="grid grid-cols-2 gap-3">
+                    {popularProducts.slice(0, 4).map((product) => (
                       <button
                         key={product.id}
+                        type="button"
                         onClick={() => addItem(product)}
                         className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 hover:border-primary/30 transition-all group text-left"
                       >
@@ -342,7 +494,7 @@ export default function NewStockEntryForm({
                           </p>
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-muted-foreground">
-                              {product.unit}
+                              {product.base_unit}
                             </span>
                             <span className="text-xs font-medium">
                               {formatPrice(product.cost_price || 0)}
@@ -352,297 +504,237 @@ export default function NewStockEntryForm({
                       </button>
                     ))}
                   </div>
-                </>
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Two Columns Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Supplier Information */}
-          <div className="lg:col-span-1">
-            <Card className="h-full">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Truck className="h-5 w-5 text-blue-600" />
-                  Thông tin đối tác
+          {/* Danh sách sản phẩm đã thêm */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-muted-foreground" />
+                  Danh sách sản phẩm ({items.length})
                 </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-input" className="text-sm">
-                    Nhà cung cấp <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="supplier-input"
-                    ref={supplierInputRef}
-                    placeholder="Nhập tên nhà cung cấp..."
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    className="h-10"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Ghi chú
-                  </Label>
-                  <Textarea
-                    placeholder="Ghi chú về đơn hàng..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
-                    className="resize-none"
-                  />
-                </div>
-
-                <Separator />
-
-                {/* Quick Stats */}
-                <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium">Thống kê nhanh</span>
-                    <Badge className="gap-1">{items.length} SP</Badge>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Package className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Số lượng tổng
-                          </p>
-                          <p className="font-bold">{itemCount}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <DollarSign className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Tổng tiền
-                          </p>
-                          <p className="font-bold">
-                            {formatPrice(totalAmount)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Product List */}
-          <div className="lg:col-span-2">
-            <Card className="h-full">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Layers className="h-5 w-5 text-primary" />
-                      Danh sách sản phẩm đã thêm
-                    </CardTitle>
-                    <CardDescription>
-                      {items.length === 0
-                        ? "Chưa có sản phẩm nào. Tìm kiếm và thêm sản phẩm ở trên."
-                        : `Đã thêm ${items.length} sản phẩm vào phiếu`}
-                    </CardDescription>
-                  </div>
-                  {items.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setItems([])}
-                      className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Xóa tất cả
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-
-              <CardContent>
-                {items.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader className="bg-muted/50">
-                            <TableRow>
-                              <TableHead className="w-[250px]">
-                                Sản phẩm
-                              </TableHead>
-                              <TableHead className="text-center">
-                                Số lô
-                              </TableHead>
-                              <TableHead className="text-center">
-                                Hạn dùng
-                              </TableHead>
-                              <TableHead className="text-center">
-                                Số lượng
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Đơn giá
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Thành tiền
-                              </TableHead>
-                              <TableHead className="w-[60px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {items.map((item, idx) => (
-                              <TableRow key={idx} className="hover:bg-muted/30">
-                                <TableCell>
-                                  <div className="space-y-1">
-                                    <div className="font-medium">
-                                      {item.name}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        {item.unit}
+                {items.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setItems([])}
+                    className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    Xóa tất cả
+                  </Button>
+                )}
+              </div>
+              <CardDescription>
+                {items.length === 0
+                  ? "Chưa có sản phẩm nào. Tìm kiếm và thêm sản phẩm ở trên."
+                  : `Đã thêm ${items.length} sản phẩm vào phiếu`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {items.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader className="bg-muted/30">
+                          <TableRow>
+                            <TableHead className="min-w-[250px]">Sản phẩm</TableHead>
+                            <TableHead className="min-w-[120px]">Số lô</TableHead>
+                            <TableHead className="min-w-[120px]">Hạn dùng</TableHead>
+                            <TableHead className="min-w-[80px] text-center">SL</TableHead>
+                            <TableHead className="min-w-[140px] text-right">Đơn giá</TableHead>
+                            <TableHead className="min-w-[120px] text-right">Thành tiền</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.map((item, idx) => (
+                            <TableRow key={idx} className="hover:bg-muted/30">
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="font-medium text-sm">
+                                    {item.name}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {item.unit}
+                                    </Badge>
+                                    {item.manage_by_batch && (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <Layers className="h-3 w-3" />
+                                        Theo lô
                                       </Badge>
-                                      {item.manage_by_batch && (
-                                        <Badge
-                                          variant="secondary"
-                                          className="text-xs gap-1"
-                                        >
-                                          <Layers className="h-3 w-3" />
-                                          Theo lô
-                                        </Badge>
-                                      )}
-                                    </div>
+                                    )}
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  {item.manage_by_batch ? (
-                                    <div className="flex items-center gap-1">
-                                      <Hash className="h-4 w-4 text-muted-foreground" />
-                                      <Input
-                                        placeholder="Số lô"
-                                        value={item.batch_number}
-                                        onChange={(e) =>
-                                          updateItem(
-                                            idx,
-                                            "batch_number",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="h-9 w-full text-sm"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {item.manage_by_batch ? (
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                                      <Input
-                                        type="date"
-                                        value={item.expiry_date}
-                                        onChange={(e) =>
-                                          updateItem(
-                                            idx,
-                                            "expiry_date",
-                                            e.target.value,
-                                          )
-                                        }
-                                        className="h-9 text-sm"
-                                      />
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
+                                </div>
+                              </TableCell>
+                              
+                              {/* Số lô */}
+                              <TableCell>
+                                {item.manage_by_batch ? (
+                                  <div>
+                                    <Input
+                                      placeholder="Số lô"
+                                      value={item.batch_number}
+                                      onChange={(e) =>
+                                        updateItem(idx, "batch_number", e.target.value)
+                                      }
+                                      className={`h-9 text-sm ${errors[`item_${idx}_batch`] ? "border-destructive" : ""}`}
+                                    />
+                                    {errors[`item_${idx}_batch`] && (
+                                      <p className="text-xs text-destructive mt-1">
+                                        {errors[`item_${idx}_batch`]}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              
+                              {/* Hạn dùng */}
+                              <TableCell>
+                                {item.manage_by_batch ? (
+                                  <div>
+                                    <Input
+                                      type="date"
+                                      value={item.expiry_date}
+                                      onChange={(e) =>
+                                        updateItem(idx, "expiry_date", e.target.value)
+                                      }
+                                      className={`h-9 text-sm ${errors[`item_${idx}_expiry`] ? "border-destructive" : ""}`}
+                                    />
+                                    {errors[`item_${idx}_expiry`] && (
+                                      <p className="text-xs text-destructive mt-1">
+                                        {errors[`item_${idx}_expiry`]}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              
+                              {/* Số lượng */}
+                              <TableCell>
+                                <div>
                                   <Input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                      updateItem(
-                                        idx,
-                                        "quantity",
-                                        parseInt(e.target.value) || 0,
-                                      )
-                                    }
-                                    className="h-9 w-20 mx-auto text-center"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    value={item.quantity === 0 ? '' : item.quantity}
+                                    onChange={(e) => {
+                                      const value = e.target.value.replace(/[^\d]/g, '');
+                                      updateItem(idx, "quantity", value ? parseInt(value, 10) : 0);
+                                    }}
+                                    className={`w-20 text-center ${errors[`item_${idx}_quantity`] ? "border-destructive" : ""}`}
                                   />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">
-                                      {formatPrice(item.unit_price)}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right font-semibold text-primary">
-                                  {formatPrice(
-                                    (item.quantity || 0) *
-                                      (item.unit_price || 0),
+                                  {errors[`item_${idx}_quantity`] && (
+                                    <p className="text-xs text-destructive mt-1">
+                                      {errors[`item_${idx}_quantity`]}
+                                    </p>
                                   )}
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                                    onClick={() => removeItem(idx)}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                </div>
+                              </TableCell>
+                              
+                              {/* Đơn giá */}
+                              <TableCell>
+                                <div className="relative min-w-[140px]">
+                                  <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    value={item.unit_price === 0 ? '' : item.unit_price}
+                                    onChange={(e) => {
+                                      const value = e.target.value.replace(/[^\d]/g, '');
+                                      updateItem(idx, "unit_price", value ? parseInt(value, 10) : 0);
+                                    }}
+                                    onBlur={(e) => {
+                                      // Format lại khi mất focus
+                                      if (e.target.value) {
+                                        const num = parseInt(e.target.value.replace(/[^\d]/g, ''), 10);
+                                        updateItem(idx, "unit_price", num);
+                                      }
+                                    }}
+                                    placeholder="0"
+                                    className={`pl-8 pr-2 h-9 text-right font-mono ${errors[`item_${idx}_price`] ? "border-destructive" : ""}`}
+                                  />
+                                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">
+                                    ₫
+                                  </span>
+                                  {errors[`item_${idx}_price`] && (
+                                    <p className="text-xs text-destructive mt-1 absolute -bottom-5 left-0 whitespace-nowrap">
+                                      {errors[`item_${idx}_price`]}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              
+                              {/* Thành tiền */}
+                              <TableCell className="text-right font-semibold text-primary min-w-[120px]">
+                                {formatPrice((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}
+                              </TableCell>
+                              
+                              {/* Nút xóa */}
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={() => removeItem(idx)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
+                  </div>
 
-                    {/* Summary & Action */}
-                    <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">
-                            Tổng thanh toán
-                          </p>
-                          <p className="text-3xl font-bold text-primary">
-                            {formatPrice(totalAmount)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {items.length} sản phẩm • {itemCount} đơn vị
-                          </p>
-                        </div>
+                  {/* Tổng kết và nút lưu */}
+                  <div className="bg-primary/5 rounded-xl p-6 border border-primary/10">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">
+                          Tổng thanh toán
+                        </p>
+                        <p className="text-3xl font-bold text-primary">
+                          {formatPrice(totalAmount)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {items.length} sản phẩm • {itemCount} đơn vị
+                        </p>
+                      </div>
 
+                      <div className="flex items-center gap-3">
                         <Button
-                          onClick={handleSave}
-                          disabled={
-                            loading || !supplier.trim() || items.length === 0
-                          }
+                          type="button"
+                          variant="outline"
+                          onClick={() => router.back()}
+                          disabled={loading}
+                          className="gap-2 h-10 px-4"
+                        >
+                          <ArrowLeftRight className="h-4 w-4 rotate-180" />
+                          Hủy
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={loading}
                           size="lg"
                           className="gap-2 shadow-md hover:shadow-lg transition-shadow min-w-[200px]"
                         >
                           {loading ? (
                             <>
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                               Đang lưu...
                             </>
                           ) : (
@@ -655,47 +747,35 @@ export default function NewStockEntryForm({
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-16">
-                    <div className="w-24 h-24 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-6">
-                      <ShoppingCart className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-xl font-medium mb-3">
-                      Chưa có sản phẩm nào trong phiếu
-                    </h3>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                      Sử dụng công cụ tìm kiếm ở trên để thêm sản phẩm vào phiếu
-                      nhập
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                      <Button
-                        variant="outline"
-                        className="gap-2"
-                        onClick={() => {
-                          if (products.length > 0) addItem(products[0]);
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Thêm sản phẩm mẫu
-                      </Button>
-                      {!showQuickProducts && (
-                        <Button
-                          variant="ghost"
-                          onClick={() => setShowQuickProducts(true)}
-                          className="gap-2"
-                        >
-                          <Search className="h-4 w-4" />
-                          Hiện sản phẩm thường dùng
-                        </Button>
-                      )}
-                    </div>
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="w-24 h-24 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-6">
+                    <ShoppingCart className="h-12 w-12 text-muted-foreground" />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  <h3 className="text-lg font-medium mb-3">
+                    Chưa có sản phẩm nào
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                    Sử dụng công cụ tìm kiếm ở trên để thêm sản phẩm vào phiếu nhập
+                  </p>
+                  {!showQuickProducts && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowQuickProducts(true)}
+                      className="gap-2"
+                    >
+                      <Search className="h-4 w-4" />
+                      Hiện sản phẩm thường dùng
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </div>
+    </form>
   );
 }

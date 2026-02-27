@@ -1,3 +1,4 @@
+// components/entries/EntriesClient.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -42,7 +43,7 @@ import { toast } from "sonner";
 import { EntryDetailsModal } from "./EntryDetailModel";
 
 interface EntriesClientProps {
-  initialEntries: (StockEntry & { item_count?: number })[]; // Thêm item_count optional
+  initialEntries: (StockEntry & { item_count?: number })[];
   currentPage: number;
   totalPages: number;
   totalCount: number;
@@ -122,44 +123,77 @@ export function EntriesClient({
   return (
     <TooltipProvider>
       <div className="space-y-4">
-        {/* Filters */}
-        <Card>
+        {/* Filters - Giống ProductFilters nhưng đơn giản hơn */}
+        <Card className="border">
           <CardContent className="p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Tìm theo mã phiếu, nhà cung cấp..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-9 text-sm"
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-medium">Lọc phiếu nhập</h3>
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                    {activeFilterCount}
+                  </Badge>
                 )}
               </div>
 
+              {(search || dateFrom || dateTo) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearch("");
+                    setDateFrom("");
+                    setDateTo("");
+                    router.push("/entries");
+                  }}
+                  className="h-7 px-2 text-xs text-muted-foreground"
+                >
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  Xóa lọc
+                </Button>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Tìm theo mã phiếu, nhà cung cấp..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Date Filters */}
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant={showFilters ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowFilters(!showFilters)}
-                className="h-9 gap-2"
+                className="h-8 gap-1.5 text-xs"
               >
-                <SlidersHorizontal className="h-4 w-4" />
-                <span className="hidden sm:inline">Lọc ngày</span>
+                <Calendar className="h-3.5 w-3.5" />
+                Lọc theo ngày
                 {activeFilterCount > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                  <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
                     {activeFilterCount}
                   </Badge>
                 )}
               </Button>
             </div>
 
+            {/* Date Inputs */}
             {showFilters && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border">
                 <div className="space-y-2">
@@ -186,11 +220,30 @@ export function EntriesClient({
                 </div>
               </div>
             )}
+
+            {/* Result count - Giống products */}
+            <div className="flex items-center justify-between text-sm pt-1 border-t">
+              <span className="text-muted-foreground">Kết quả</span>
+              <span className="font-medium">
+                {totalCount.toLocaleString()} phiếu
+              </span>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Table */}
-        <Card className="overflow-hidden">
+        {/* Table - Giống ProductsTable */}
+        <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b bg-muted/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-medium">Danh sách phiếu nhập</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {totalCount} phiếu • Trang {currentPage}/{totalPages}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
@@ -206,7 +259,6 @@ export function EntriesClient({
               <TableBody>
                 {initialEntries.length > 0 ? (
                   initialEntries.map((entry) => {
-                    // Tính số sản phẩm từ items nếu không có item_count
                     const itemCount = entry.item_count || (entry as any).items?.length || 0;
                     
                     return (
@@ -278,68 +330,119 @@ export function EntriesClient({
               </TableBody>
             </Table>
           </div>
-        </Card>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2">
-            <div className="text-sm text-muted-foreground">
-              Hiển thị {(currentPage - 1) * 10 + 1} -{" "}
-              {Math.min(currentPage * 10, totalCount)} / {totalCount} phiếu
+          {/* Pagination - Giống PaginationControl của products */}
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t bg-muted/10">
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-4 py-2">
+                {/* Thông tin kết quả */}
+                <div className="text-sm text-muted-foreground order-2 lg:order-1">
+                  <span className="font-medium text-foreground">{totalCount}</span> kết quả
+                  <span className="mx-2">•</span>
+                  Trang <span className="font-medium text-foreground">{currentPage}</span>/{totalPages}
+                </div>
+
+                {/* Phân trang */}
+                <div className="hidden md:flex items-center gap-1 order-1 lg:order-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex items-center gap-1 mx-1">
+                    {pageNumbers.map((pageNum) => (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        className="h-8 w-8 text-sm font-normal"
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className="h-8 w-8"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage >= totalPages}
+                    className="h-8 w-8"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Phân trang mobile */}
+                <div className="flex md:hidden items-center justify-between w-full order-1 lg:order-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm">
+                    <span className="font-medium">{currentPage}</span>/{totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className="h-8 w-8"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage >= totalPages}
+                    className="h-8 w-8"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handlePageChange(1)}
-                disabled={currentPage === 1}
-                className="h-8 w-8"
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              {pageNumbers.map((pageNum) => (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? "default" : "outline"}
-                  size="sm"
-                  className="h-8 w-8 text-sm"
-                  onClick={() => handlePageChange(pageNum)}
-                >
-                  {pageNum}
-                </Button>
-              ))}
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => handlePageChange(totalPages)}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8"
-              >
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Detail Modal */}
         <EntryDetailsModal

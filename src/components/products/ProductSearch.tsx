@@ -1,166 +1,171 @@
-// "use client";
-// import * as React from "react";
-// import { Check, ChevronsUpDown, Search } from "lucide-react";
-// import { cn } from "@/lib/utils";
-// import { Button } from "@/components/ui/button";
-// import {
-//   Command,
-//   CommandEmpty,
-//   CommandGroup,
-//   CommandInput,
-//   CommandItem,
-//   CommandList,
-// } from "@/components/ui/command";
-// import {
-//   Popover,
-//   PopoverContent,
-//   PopoverTrigger,
-// } from "@/components/ui/popover";
-// import { Product } from "@/types";
-
-// export function ProductSearch({
-//   products,
-//   onSelect,
-// }: {
-//   products: Product[];
-//   onSelect: (p: Product) => void;
-// }) {
-//   const [open, setOpen] = React.useState(false);
-
-//   return (
-//     <Popover open={open} onOpenChange={setOpen}>
-//       <PopoverTrigger asChild>
-//         <Button
-//           variant="outline"
-//           role="combobox"
-//           aria-expanded={open}
-//           className="w-full justify-between h-12 text-base"
-//         >
-//           <div className="flex items-center gap-2">
-//             <Search className="h-4 w-4 shrink-0 opacity-50" />
-//             Tìm tên thuốc hoặc mã nội bộ...
-//           </div>
-//           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-//         </Button>
-//       </PopoverTrigger>
-//       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-//         <Command>
-//           <CommandInput placeholder="Nhập tên thuốc..." />
-//           <CommandList>
-//             <CommandEmpty>Không tìm thấy sản phẩm.</CommandEmpty>
-//             <CommandGroup>
-//               {products.map((product) => (
-//                 <CommandItem
-//                   key={product.id}
-//                   value={product.name + product.internal_code}
-//                   onSelect={() => {
-//                     onSelect(product);
-//                     setOpen(false);
-//                   }}
-//                 >
-//                   <div className="flex flex-col">
-//                     <span className="font-bold">{product.name}</span>
-//                     <span className="text-xs text-muted-foreground">
-//                       Mã: {product.internal_code} - Tồn: {product.current_stock}
-//                     </span>
-//                   </div>
-//                 </CommandItem>
-//               ))}
-//             </CommandGroup>
-//           </CommandList>
-//         </Command>
-//       </PopoverContent>
-//     </Popover>
-//   );
-// }
-
+// components/products/ProductSearch.tsx
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Package, Loader2 } from "lucide-react";
 import { Product } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { searchProductsForEntry } from "@/app/actions/inventory";
+import { useDebouncedCallback } from "use-debounce";
+import { formatPrice } from "@/lib/utils";
 
 interface ProductSearchProps {
-  products: Product[];
+  products?: Product[];
   onSelect: (product: Product) => void;
+  placeholder?: string;
 }
 
-export function ProductSearch({ products = [], onSelect }: ProductSearchProps) {
+export function ProductSearch({ 
+  products: initialProducts = [], 
+  onSelect,
+  placeholder = "Tìm kiếm sản phẩm theo tên, mã, barcode..."
+}: ProductSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [results, setResults] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  const safeProducts = Array.isArray(products) ? products : [];
+  // Đóng kết quả khi click ra ngoài
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const filtered =
-    searchTerm === ""
-      ? []
-      : safeProducts.filter(
-          (p) =>
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.internal_code.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+  // Debounced search
+  const debouncedSearch = useDebouncedCallback(async (term: string) => {
+    if (term.length < 2) {
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const result = await searchProductsForEntry(term);
+      if (result.success) {
+        setResults(result.data);
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, 500);
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+    setShowResults(true);
+    debouncedSearch(term);
+  };
+
+  const handleSelect = (product: Product) => {
+    onSelect(product);
+    setSearchTerm("");
+    setResults([]);
+    setShowResults(false);
+  };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" ref={searchRef}>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Tìm kiếm sản phẩm..."
-          className="pl-9"
+          placeholder={placeholder}
+          className="pl-9 pr-10"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => handleSearch(e.target.value)}
+          onFocus={() => setShowResults(true)}
         />
+        {isSearching && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
 
-      {filtered.length > 0 && (
-        <div className="absolute z-50 w-full bg-card border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
-          {filtered.map((product) => (
-            <div
-              key={product.id}
-              className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-0 transition-colors"
-              onClick={() => {
-                onSelect(product);
-                setSearchTerm("");
-              }}
-            >
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1">
-                  <div className="font-medium text-sm">{product.name}</div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs px-1.5 py-0">
-                      {product.internal_code}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      Tồn: {product.current_stock} {product.unit}
-                    </span>
+      {showResults && searchTerm.length >= 2 && (
+        <div className="absolute z-50 w-full bg-card border rounded-lg shadow-lg mt-1 max-h-80 overflow-y-auto">
+          {isSearching ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+              <p className="text-sm">Đang tìm kiếm...</p>
+            </div>
+          ) : results.length > 0 ? (
+            results.map((product) => (
+              <div
+                key={product.id}
+                className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-0 transition-colors"
+                onClick={() => handleSelect(product)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1 flex-1">
+                    <div className="font-medium text-sm">{product.name}</div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs px-1.5 py-0">
+                        {product.internal_code}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        ĐVT: {product.base_unit}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">
+                        Giá vốn: {formatPrice(product.cost_price || 0)}
+                      </span>
+                      <span>•</span>
+                      <span className="text-muted-foreground">
+                        Giá bán: {formatPrice(product.sale_price || 0)}
+                      </span>
+                    </div>
                   </div>
+                  {product.manage_by_batch && (
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                      Theo lô
+                    </Badge>
+                  )}
                 </div>
-                {product.manage_by_batch ? (
-                  <Badge
-                    variant="secondary"
-                    className="text-xs bg-violet-100 text-violet-800"
-                  >
-                    Theo lô
-                  </Badge>
-                ) : (
-                  <Badge
-                    variant="secondary"
-                    className="text-xs bg-blue-100 text-blue-800"
-                  >
-                    Tổng hợp
-                  </Badge>
-                )}
+              </div>
+            ))
+          ) : (
+            <div className="p-4 text-center">
+              <div className="text-sm text-muted-foreground">
+                Không tìm thấy sản phẩm "{searchTerm}"
               </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
-      {searchTerm !== "" && filtered.length === 0 && (
-        <div className="absolute z-50 w-full bg-card border rounded-lg mt-1 p-4 text-center">
-          <div className="text-sm text-muted-foreground">
-            Không tìm thấy sản phẩm
+      {/* Hiển thị gợi ý khi chưa nhập */}
+      {!searchTerm && initialProducts.length > 0 && showResults && (
+        <div className="absolute z-50 w-full bg-card border rounded-lg shadow-lg mt-1 max-h-80 overflow-y-auto">
+          <div className="p-2 bg-muted/30 text-xs font-medium text-muted-foreground">
+            Gợi ý nhanh
           </div>
+          {initialProducts.slice(0, 5).map((product) => (
+            <div
+              key={product.id}
+              className="p-2 hover:bg-muted/50 cursor-pointer border-b last:border-0 transition-colors"
+              onClick={() => handleSelect(product)}
+            >
+              <div className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <div className="text-sm font-medium">{product.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {product.internal_code} • {product.base_unit}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
