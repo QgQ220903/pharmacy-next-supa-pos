@@ -43,7 +43,6 @@ const COMMON_UNITS = [
   "Ống", "Miếng", "Túi", "Thùng", "Kg", "Gram", "Ml", "Lít"
 ];
 
-// Interface cho dữ liệu gửi lên server (bao gồm cả units)
 interface ProductSubmitData {
   internal_code: string;
   barcode?: string | null;
@@ -57,6 +56,13 @@ interface ProductSubmitData {
   is_active: boolean;
   units?: ProductUnit[];
 }
+
+// Helper để format số khi nhập
+const formatNumberInput = (value: string) => {
+  // Chỉ giữ lại số
+  const number = value.replace(/[^\d]/g, '');
+  return number ? parseInt(number, 10) : 0;
+};
 
 export function ProductForm({ initialData, categories = [] }: ProductFormProps) {
   const router = useRouter();
@@ -99,7 +105,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
     ]
   };
 
-  const { register, handleSubmit, watch, setValue, control } = useForm<any>({
+  const { register, handleSubmit, watch, setValue, control, getValues } = useForm<any>({
     defaultValues,
   });
 
@@ -128,15 +134,23 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
     }
   }, [watchSalePrice, setValue, fields.length]);
 
-  // ĐÃ XÓA: Tự động tính giá cho các đơn vị dựa trên tỉ lệ quy đổi
-
   const validateForm = (data: any): boolean => {
     const newErrors: Record<string, string> = {};
     if (!data.internal_code?.trim()) newErrors.internal_code = "Mã sản phẩm là bắt buộc";
     if (!data.name?.trim()) newErrors.name = "Tên sản phẩm là bắt buộc";
     if (!data.base_unit?.trim()) newErrors.base_unit = "Đơn vị cơ bản là bắt buộc";
-    if (data.sale_price < 0) newErrors.sale_price = "Giá bán không được âm";
-    if (data.min_stock < 0) newErrors.min_stock = "Tồn tối thiểu không được âm";
+    
+    // Kiểm tra giá bán
+    const salePrice = Number(data.sale_price);
+    if (isNaN(salePrice) || salePrice < 0) {
+      newErrors.sale_price = "Giá bán không hợp lệ";
+    }
+    
+    // Kiểm tra tồn tối thiểu
+    const minStock = Number(data.min_stock);
+    if (isNaN(minStock) || minStock < 0) {
+      newErrors.min_stock = "Tồn tối thiểu không hợp lệ";
+    }
     
     // Validate đơn vị cơ bản
     if (!data.units[0]?.unit_name?.trim()) {
@@ -151,7 +165,8 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
           newErrors.units = "Tất cả đơn vị phải có tên";
           break;
         }
-        if (unit.conversion_factor <= 0) {
+        const conversionFactor = Number(unit.conversion_factor);
+        if (isNaN(conversionFactor) || conversionFactor <= 0) {
           newErrors.units = "Tỉ lệ quy đổi phải lớn hơn 0";
           break;
         }
@@ -170,23 +185,23 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
 
     setIsSubmitting(true);
     try {
-      // Chuẩn bị dữ liệu gửi lên server (bao gồm cả units)
+      // Chuẩn bị dữ liệu gửi lên server
       const submitData: ProductSubmitData = {
         internal_code: data.internal_code,
         barcode: data.barcode || null,
         name: data.name,
         category: data.category || null,
         base_unit: data.base_unit,
-        sale_price: Number(data.sale_price),
+        sale_price: Number(data.sale_price) || 0,
         cost_price: data.cost_price ? Number(data.cost_price) : null,
-        min_stock: Number(data.min_stock),
+        min_stock: Number(data.min_stock) || 0,
         manage_by_batch: data.manage_by_batch,
         is_active: data.is_active,
         units: data.units.map((unit: any, index: number) => ({
           unit_name: unit.unit_name,
-          conversion_factor: Number(unit.conversion_factor),
-          sale_price: Number(unit.sale_price),
-          is_base_unit: index === 0, // Đơn vị đầu tiên là base unit
+          conversion_factor: Number(unit.conversion_factor) || 1,
+          sale_price: Number(unit.sale_price) || 0,
+          is_base_unit: index === 0,
         })),
       };
 
@@ -218,9 +233,18 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
     append({
       unit_name: "",
       conversion_factor: 1,
-      sale_price: 0, // Không tự động lấy từ watchSalePrice nữa
+      sale_price: 0,
       is_base_unit: false
     });
+  };
+
+  // Custom input handler cho số
+  const handleNumberInput = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldName: string
+  ) => {
+    const value = formatNumberInput(e.target.value);
+    setValue(fieldName, value, { shouldValidate: true });
   };
 
   return (
@@ -229,7 +253,7 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
         <Alert variant="destructive" className="py-3">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="text-sm">
-            {errors.units || "Vui lòng kiểm tra lại các trường thông tin bắt buộc."}
+            {errors.units || errors.sale_price || errors.min_stock || "Vui lòng kiểm tra lại các trường thông tin bắt buộc."}
           </AlertDescription>
         </Alert>
       )}
@@ -344,11 +368,12 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                 <Label className="text-xs text-muted-foreground">Giá vốn tham khảo</Label>
                 <div className="relative">
                   <Input
-                    type="number"
-                    {...register("cost_price", { valueAsNumber: true })}
+                    type="text"
+                    inputMode="numeric"
+                    value={watch("cost_price") || ''}
+                    onChange={(e) => handleNumberInput(e, "cost_price")}
                     className="h-9 pl-7 text-sm"
-                    min="0"
-                    step="1000"
+                    placeholder="0"
                   />
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                     ₫
@@ -362,11 +387,12 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                     Tồn tối thiểu <span className="text-destructive">*</span>
                   </Label>
                   <Input
-                    type="number"
-                    {...register("min_stock", { valueAsNumber: true })}
+                    type="text"
+                    inputMode="numeric"
+                    value={watch("min_stock") || ''}
+                    onChange={(e) => handleNumberInput(e, "min_stock")}
                     className={cn("h-9 text-sm", errors.min_stock && "border-destructive")}
-                    min="0"
-                    step="1"
+                    placeholder="0"
                   />
                 </div>
                 <div className="space-y-2">
@@ -407,16 +433,20 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                   <Label className="text-sm font-medium">Giá bán cơ bản</Label>
                   <div className="relative">
                     <Input
-                      type="number"
-                      {...register("sale_price", { valueAsNumber: true })}
-                      className="h-10 pl-8 text-base font-medium"
-                      min="0"
-                      step="1000"
+                      type="text"
+                      inputMode="numeric"
+                      value={watch("sale_price") || ''}
+                      onChange={(e) => handleNumberInput(e, "sale_price")}
+                      className={cn("h-10 pl-8 text-base font-medium", errors.sale_price && "border-destructive")}
+                      placeholder="0"
                     />
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                       ₫
                     </span>
                   </div>
+                  {errors.sale_price && (
+                    <p className="text-xs text-destructive">{errors.sale_price}</p>
+                  )}
                 </div>
               </div>
 
@@ -470,13 +500,15 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                                 </Label>
                                 <div className="flex items-center gap-2">
                                   <Input
-                                    type="number"
-                                    {...register(`units.${actualIndex}.conversion_factor`, {
-                                      valueAsNumber: true,
-                                    })}
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={watch(`units.${actualIndex}.conversion_factor`) || ''}
+                                    onChange={(e) => {
+                                      const value = formatNumberInput(e.target.value);
+                                      setValue(`units.${actualIndex}.conversion_factor`, value || 1);
+                                    }}
                                     className="h-10 text-base text-center"
-                                    min="1"
-                                    step="1"
+                                    placeholder="1"
                                   />
                                   <span className="text-sm text-muted-foreground whitespace-nowrap">
                                     = 1 {watchBaseUnit || "đv"}
@@ -491,13 +523,15 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                                 </Label>
                                 <div className="relative">
                                   <Input
-                                    type="number"
-                                    {...register(`units.${actualIndex}.sale_price`, {
-                                      valueAsNumber: true,
-                                    })}
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={watch(`units.${actualIndex}.sale_price`) || ''}
+                                    onChange={(e) => {
+                                      const value = formatNumberInput(e.target.value);
+                                      setValue(`units.${actualIndex}.sale_price`, value);
+                                    }}
                                     className="h-10 pl-8 text-base"
-                                    min="0"
-                                    step="1000"
+                                    placeholder="0"
                                   />
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                                     ₫
@@ -516,8 +550,6 @@ export function ProductForm({ initialData, categories = [] }: ProductFormProps) 
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-
-                          {/* ĐÃ XÓA: Phần thông tin tự động tính */}
                         </div>
                       );
                     })}

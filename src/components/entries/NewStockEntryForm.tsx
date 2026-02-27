@@ -45,6 +45,7 @@ import {
   Search,
   AlertCircle,
   ArrowLeftRight,
+  PackageCheck,
 } from "lucide-react";
 import { createStockEntryAction, getPopularProducts } from "@/app/actions/inventory";
 import { toast } from "sonner";
@@ -116,7 +117,7 @@ export default function NewStockEntryForm({
 
   const updateItem = (index: number, key: string, val: any) => {
     const newItems = [...items];
-    
+
     // Xử lý đặc biệt cho số
     if (key === 'quantity' || key === 'unit_price') {
       // Nếu giá trị rỗng, gán 0
@@ -136,9 +137,9 @@ export default function NewStockEntryForm({
     } else {
       newItems[index][key] = val;
     }
-    
+
     setItems(newItems);
-    
+
     // Xóa lỗi liên quan khi người dùng sửa
     if (errors[`item_${index}_${key}`]) {
       const newErrors = { ...errors };
@@ -263,8 +264,8 @@ export default function NewStockEntryForm({
         <Card className="border-green-200 shadow-lg">
           <CardContent className="p-8">
             <div className="text-center space-y-6">
-              <div className="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-10 w-10 text-green-600" />
+              <div className="bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto ring-4 ring-primary/5">
+                <PackageCheck className="h-10 w-10 text-primary" />
               </div>
               <div className="space-y-3">
                 <h2 className="text-2xl font-bold">Nhập hàng hoàn tất!</h2>
@@ -276,7 +277,7 @@ export default function NewStockEntryForm({
 
               <Separator />
 
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
+              {/* <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div className="space-y-1">
@@ -289,7 +290,7 @@ export default function NewStockEntryForm({
                     </p>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               <LabelPrinter labels={printData} />
 
@@ -574,7 +575,7 @@ export default function NewStockEntryForm({
                                   </div>
                                 </div>
                               </TableCell>
-                              
+
                               {/* Số lô */}
                               <TableCell>
                                 {item.manage_by_batch ? (
@@ -597,7 +598,7 @@ export default function NewStockEntryForm({
                                   <span className="text-sm text-muted-foreground">—</span>
                                 )}
                               </TableCell>
-                              
+
                               {/* Hạn dùng */}
                               <TableCell>
                                 {item.manage_by_batch ? (
@@ -620,7 +621,7 @@ export default function NewStockEntryForm({
                                   <span className="text-sm text-muted-foreground">—</span>
                                 )}
                               </TableCell>
-                              
+
                               {/* Số lượng */}
                               <TableCell>
                                 <div>
@@ -642,7 +643,7 @@ export default function NewStockEntryForm({
                                   )}
                                 </div>
                               </TableCell>
-                              
+
                               {/* Đơn giá */}
                               <TableCell>
                                 <div className="relative min-w-[140px]">
@@ -675,12 +676,12 @@ export default function NewStockEntryForm({
                                   )}
                                 </div>
                               </TableCell>
-                              
+
                               {/* Thành tiền */}
                               <TableCell className="text-right font-semibold text-primary min-w-[120px]">
                                 {formatPrice((Number(item.quantity) || 0) * (Number(item.unit_price) || 0))}
                               </TableCell>
-                              
+
                               {/* Nút xóa */}
                               <TableCell>
                                 <Button

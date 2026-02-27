@@ -20,14 +20,23 @@ export function formatCompactNumber(value: number): string {
 }
 
 
-export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+// lib/utils.ts
+export function formatDate(date: string | Date, format: string = "DD/MM/YYYY"): string {
+  if (!date) return "";
+  
+  const d = new Date(date);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  const shortYear = year.toString().slice(-2);
+  
+  switch (format) {
+    case "DD/MM/YY":
+      return `${day}/${month}/${shortYear}`;
+    case "DD/MM/YYYY":
+    default:
+      return `${day}/${month}/${year}`;
+  }
 }
 
 export function formatNumber(num: number): string {
