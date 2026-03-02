@@ -173,38 +173,127 @@ export async function createSaleAction(data: {
   try {
     const supabase = await createClient();
 
+    // Log dữ liệu đầu vào để debug
+    console.log("=== CREATE SALE DATA ===");
+    console.log("Customer:", data.customerName, data.customerPhone);
+    console.log("Payment:", data.paymentMethod);
+    console.log("Amounts:", { total: data.totalAmount, discount: data.discount, final: data.finalAmount });
+    console.log("Items count:", data.items.length);
+    console.log("========================");
+
     // Tạo mã hóa đơn: HD + timestamp + random
     const saleCode = `HD${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 100)}`;
+    console.log("Sale code:", saleCode);
 
-    // 1. Tạo hóa đơn
-    const { data: sale, error: saleError } = await supabase
+    // 1. Tạo hóa đơn - dùng let thay vì const
+    let saleData: any = {
+      sale_code: saleCode,
+      sale_date: new Date().toISOString().split('T')[0],
+      customer_name: data.customerName || null,
+      total_amount: data.totalAmount,
+      final_amount: data.finalAmount,
+      payment_method: data.paymentMethod,
+      created_at: new Date().toISOString(),
+    };
+
+    // Thêm các field phụ nếu có
+    if (data.customerPhone) {
+      saleData.customer_phone = data.customerPhone;
+    }
+    if (data.discount > 0) {
+      saleData.discount = data.discount;
+    }
+
+    console.log("Inserting sale with data:", saleData);
+
+    // Khai báo sale với let để có thể gán lại
+    let { data: sale, error: saleError } = await supabase
       .from("sales")
-      .insert([{
-        sale_code: saleCode,
-        sale_date: new Date().toISOString().split('T')[0],
-        customer_name: data.customerName || null,
-        customer_phone: data.customerPhone || null,
-        total_amount: data.totalAmount,
-        discount: data.discount,
-        final_amount: data.finalAmount,
-        payment_method: data.paymentMethod,
-        created_at: new Date().toISOString(),
-      }])
+      .insert([saleData])
       .select()
       .single();
 
     if (saleError) {
-      console.error("Sale error:", saleError);
-      throw new Error("Không thể tạo hóa đơn");
+      console.error("Sale error details:", {
+        message: saleError.message,
+        details: saleError.details,
+        hint: saleError.hint,
+        code: saleError.code
+      });
+      
+      // Thử insert chỉ với các field cơ bản
+      console.log("Retrying with minimal fields...");
+      const minimalData = {
+        sale_code: saleCode,
+        sale_date: new Date().toISOString().split('T')[0],
+        customer_name: data.customerName || null,
+        total_amount: data.totalAmount,
+        final_amount: data.finalAmount,
+        payment_method: data.paymentMethod,
+        created_at: new Date().toISOString(),
+      };
+
+      const { data: saleRetry, error: retryError } = await supabase
+        .from("sales")
+        .insert([minimalData])
+        .select()
+        .single();
+
+      if (retryError) {
+        console.error("Retry also failed:", retryError);
+        throw new Error(`Không thể tạo hóa đơn: ${saleError.message}`);
+      }
+
+      sale = saleRetry; // Gán lại giá trị mới
     }
 
-    // 2. Tạo chi tiết hóa đơn và cập nhật kho
+    if (!sale) {
+      throw new Error("Không thể tạo hóa đơn - không có dữ liệu trả về");
+    }
+
+    console.log("Sale created successfully:", sale.id);
+
+    // 2. KIỂM TRA TỒN KHO TRƯỚC KHI BÁN
+    for (const item of data.items) {
+      for (const batch of item.selected_batches) {
+        console.log(`Checking batch ${batch.batch_number}: need ${batch.quantity_to_deduct}`);
+        
+        const { data: currentBatch, error: fetchError } = await supabase
+          .from("product_batches")
+          .select("quantity")
+          .eq("id", batch.batch_id)
+          .single();
+
+        if (fetchError) {
+          console.error("Batch fetch error:", fetchError);
+          throw new Error(`Không tìm thấy lô ${batch.batch_number}`);
+        }
+
+        if (!currentBatch) {
+          throw new Error(`Lô ${batch.batch_number} không tồn tại`);
+        }
+
+        console.log(`Batch ${batch.batch_number} current stock: ${currentBatch.quantity}`);
+
+        if (currentBatch.quantity < batch.quantity_to_deduct) {
+          throw new Error(`Lô ${batch.batch_number} không đủ số lượng (còn: ${currentBatch.quantity}, cần: ${batch.quantity_to_deduct})`);
+        }
+      }
+    }
+
+    // 3. Tạo chi tiết hóa đơn
     for (const item of data.items) {
       const quantityInBase = item.quantity * item.conversion_factor;
-
-      // Lưu chi tiết hóa đơn (chỉ lấy batch đầu tiên vì 1 item chỉ bán từ 1 lô)
       const batchId = item.selected_batches[0]?.batch_id || null;
       
+      console.log(`Inserting sale item:`, {
+        product_id: item.product_id,
+        batch_id: batchId,
+        quantity: item.quantity,
+        quantity_in_base: quantityInBase,
+        unit_price: item.unit_price
+      });
+
       const { error: itemError } = await supabase
         .from("sale_items")
         .insert([{
@@ -220,41 +309,17 @@ export async function createSaleAction(data: {
         }]);
 
       if (itemError) {
-        console.error("Sale item error:", itemError);
-        throw new Error(`Lỗi khi lưu chi tiết hóa đơn cho sản phẩm`);
-      }
-
-      // Cập nhật số lượng lô
-      for (const batch of item.selected_batches) {
-        // Kiểm tra tồn kho lô
-        const { data: currentBatch } = await supabase
-          .from("product_batches")
-          .select("quantity")
-          .eq("id", batch.batch_id)
-          .single();
-
-        if (!currentBatch || currentBatch.quantity < batch.quantity_to_deduct) {
-          throw new Error(`Lô ${batch.batch_number} không đủ số lượng`);
-        }
-
-        // Trừ kho lô
-        const { error: batchError } = await supabase
-          .from("product_batches")
-          .update({ 
-            quantity: currentBatch.quantity - batch.quantity_to_deduct,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", batch.batch_id);
-
-        if (batchError) {
-          console.error("Batch update error:", batchError);
-          throw new Error(`Lỗi khi cập nhật lô ${batch.batch_number}`);
-        }
+        console.error("Sale item error details:", {
+          message: itemError.message,
+          details: itemError.details,
+          hint: itemError.hint,
+          code: itemError.code
+        });
+        throw new Error(`Lỗi khi lưu chi tiết hóa đơn: ${itemError.message}`);
       }
     }
 
-    // 3. Cập nhật inventory_snapshot sẽ được trigger tự động xử lý
-    // Trigger trg_after_sale_item đã được tạo trong database
+    console.log("All items inserted successfully");
 
     revalidatePath("/pos");
     revalidatePath("/sales");
@@ -266,11 +331,18 @@ export async function createSaleAction(data: {
       message: "Thanh toán thành công!" 
     };
   } catch (error: any) {
-    console.error("createSaleAction error:", error);
-    return { success: false, message: error.message || "Lỗi khi thanh toán" };
+    console.error("=== CREATE SALE ERROR ===");
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("========================");
+    
+    return { 
+      success: false, 
+      message: error.message || "Lỗi khi thanh toán" 
+    };
   }
 }
-
 // ==========================================
 // 4. LẤY DANH SÁCH HÓA ĐƠN
 // ==========================================

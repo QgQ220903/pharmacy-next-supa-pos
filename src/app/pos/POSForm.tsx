@@ -55,7 +55,6 @@ export default function POSForm({ initialProducts, totalCount }: Props) {
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [loading, setLoading] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -161,15 +160,6 @@ export default function POSForm({ initialProducts, totalCount }: Props) {
         });
       }
     }
-  };
-
-  const toggleExpand = (cartId: string) => {
-    setExpandedItems(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(cartId)) newSet.delete(cartId);
-      else newSet.add(cartId);
-      return newSet;
-    });
   };
 
   const totalAmount = cart.reduce((sum, item) => sum + (item.quantity * item.sale_price), 0);
@@ -355,7 +345,7 @@ export default function POSForm({ initialProducts, totalCount }: Props) {
             </div>
 
             {/* Cart items - scrollable with native CSS */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            <div className="flex-1 overflow-y-auto p-2 space-y-2">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-8 text-muted-foreground">
                   <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-3">
@@ -366,199 +356,144 @@ export default function POSForm({ initialProducts, totalCount }: Props) {
                 </div>
               ) : (
                 cart.map((item) => {
-                  const isExpanded = expandedItems.has(item.cartId);
                   const needsBatch = item.manage_by_batch && item.selected_batches.length === 0;
 
                   return (
                     <Card
                       key={item.cartId}
-                      className={`overflow-hidden transition-all border-l-2 ${needsBatch
+                      className={`overflow-hidden border-l-2 ${needsBatch
                           ? 'border-l-destructive shadow-sm'
                           : 'border-l-primary hover:shadow-sm'
                         }`}
                     >
-                      {/* Phần thu gọn - luôn hiển thị */}
-                      <div className="p-2">
-                        <div className="flex items-start gap-2">
-                          {/* Avatar nhỏ hơn */}
-                          <div className={`h-8 w-8 rounded-lg shrink-0 flex items-center justify-center ${needsBatch ? 'bg-destructive/10' : 'bg-primary/10'
-                            }`}>
-                            <Package className={`h-4 w-4 ${needsBatch ? 'text-destructive' : 'text-primary'
-                              }`} />
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            {/* Dòng 1: Tên sản phẩm và nút xóa */}
-                            <div className="flex items-start justify-between gap-1">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-sm truncate pr-1">{item.name}</h4>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 shrink-0 hover:bg-destructive/10 hover:text-destructive -mt-0.5 -mr-1"
-                                onClick={() => removeFromCart(item.cartId)}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
+                      <div className="p-3">
+                        {/* Dòng 1: Thông tin cơ bản và nút xóa */}
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div className={`h-8 w-8 rounded-lg shrink-0 flex items-center justify-center ${needsBatch ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                              <Package className={`h-4 w-4 ${needsBatch ? 'text-destructive' : 'text-primary'}`} />
                             </div>
-
-                            {/* Dòng 2: Đơn vị, số lượng, đơn giá, tổng tiền */}
-                            <div className="flex items-center justify-between mt-1">
-                              <div className="flex items-center gap-2">
-                                {/* Badge đơn vị và lô gộp lại */}
-                                <div className="flex items-center gap-1">
-                                  <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4">
-                                    {item.base_unit}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate">{item.name}</h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+                                  {item.unit_name}
+                                </Badge>
+                                {item.manage_by_batch && (
+                                  <Badge
+                                    variant={needsBatch ? "destructive" : "outline"}
+                                    className="text-[10px] px-1 py-0 h-4 cursor-pointer"
+                                    onClick={() => {
+                                      setSelectedProduct({
+                                        id: item.product_id,
+                                        name: item.name,
+                                        base_unit: item.base_unit
+                                      });
+                                      setSelectedCartId(item.cartId);
+                                      setBatchDialogOpen(true);
+                                    }}
+                                  >
+                                    {needsBatch ? '⚠ Chọn lô' : `Lô: ${item.selected_batches[0]?.batch_number}`}
                                   </Badge>
-                                  {item.manage_by_batch && (
-                                    <Badge
-                                      variant={needsBatch ? "destructive" : "outline"}
-                                      className="text-[9px] px-1 py-0 h-4 whitespace-nowrap"
-                                    >
-                                      {needsBatch ? '⚠ Chọn lô' : `Lô: ${item.selected_batches[0]?.batch_number}`}
-                                    </Badge>
-                                  )}
-                                </div>
-
-                                {/* Số lượng và đơn giá */}
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                  {item.quantity} × {formatPrice(item.sale_price)}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-semibold text-primary">
-                                  {formatPrice(item.quantity * item.sale_price)}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => toggleExpand(item.cartId)}
-                                >
-                                  {isExpanded ?
-                                    <ChevronUp className="h-3.5 w-3.5" /> :
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                  }
-                                </Button>
+                                )}
                               </div>
                             </div>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeFromCart(item.cartId)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
+
+                        {/* Dòng 2: Điều chỉnh số lượng và đơn giá */}
+                        <div className="flex items-center gap-3">
+                          {/* Chọn đơn vị tính */}
+                          {item.units && item.units.length > 0 && (
+                            <select
+                              className="h-8 text-xs border rounded-md px-2 bg-background focus:ring-1 focus:ring-primary w-24"
+                              value={item.product_unit_id || "base"}
+                              onChange={(e) => handleUnitChange(item, e.target.value)}
+                            >
+                              <option value="base">{item.base_unit}</option>
+                              {item.units?.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.unit_name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          {/* Điều chỉnh số lượng */}
+                          <div className="flex items-center border rounded-md">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none hover:bg-muted"
+                              onClick={() => updateCartItem(item.cartId, { quantity: Math.max(1, item.quantity - 1) })}
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val) && val >= 1) updateCartItem(item.cartId, { quantity: val });
+                              }}
+                              className="h-8 w-16 text-center rounded-none border-0 [appearance:textfield] text-sm px-0"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-none hover:bg-muted"
+                              onClick={() => updateCartItem(item.cartId, { quantity: item.quantity + 1 })}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+
+                          {/* Điều chỉnh đơn giá */}
+                          <div className="relative flex-1 max-w-[140px]">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={item.sale_price.toLocaleString('vi-VN')}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/[^\d]/g, '');
+                                const val = parseInt(raw);
+                                if (!isNaN(val) && val >= 0) updateCartItem(item.cartId, { sale_price: val });
+                              }}
+                              className="h-8 text-sm pl-6 pr-2 text-right"
+                            />
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₫</span>
+                          </div>
+
+                          {/* Thành tiền */}
+                          <div className="text-right min-w-[100px]">
+                            <div className="text-sm font-semibold text-primary">
+                              {formatPrice(item.quantity * item.sale_price)}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {formatPrice(item.sale_price)}/{item.unit_name}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Hiển thị lô đã chọn (nếu có) */}
+                        {item.manage_by_batch && item.selected_batches.length > 0 && (
+                          <div className="mt-2 text-xs text-muted-foreground bg-muted/30 p-1.5 rounded flex items-center gap-2">
+                            <Package className="h-3 w-3" />
+                            <span>Lô: {item.selected_batches[0].batch_number}</span>
+                            <span>•</span>
+                            <span>HSD: {formatDate(item.selected_batches[0].expiry_date, "DD/MM/YYYY")}</span>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Phần mở rộng - chỉ hiện khi cần chỉnh sửa */}
-                      {isExpanded && (
-                        <div className="px-2 pb-2 pt-0 border-t mt-1">
-                          <div className="bg-muted/30 rounded-lg p-2 space-y-2">
-                            {/* Chọn đơn vị tính */}
-                            {item.units && item.units.length > 0 && (
-                              <div className="flex items-center gap-2">
-                                <Label className="text-[10px] font-medium text-muted-foreground w-12">
-                                  Đơn vị
-                                </Label>
-                                <select
-                                  className="flex-1 h-7 text-xs border rounded-md px-2 bg-background focus:ring-1 focus:ring-primary"
-                                  value={item.product_unit_id || "base"}
-                                  onChange={(e) => handleUnitChange(item, e.target.value)}
-                                >
-                                  <option value="base">{item.base_unit}</option>
-                                  {item.units?.map((u) => (
-                                    <option key={u.id} value={u.id}>
-                                      {u.unit_name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-
-                            {/* Chọn lô */}
-                            {item.manage_by_batch && (
-                              <div className="flex items-center gap-2">
-                                <Label className="text-[10px] font-medium text-muted-foreground w-12">
-                                  Lô
-                                </Label>
-                                <Button
-                                  variant={item.selected_batches.length > 0 ? "outline" : "default"}
-                                  size="sm"
-                                  className={`flex-1 h-7 text-xs justify-start ${needsBatch ? 'bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/30' : ''
-                                    }`}
-                                  onClick={() => {
-                                    setSelectedProduct({
-                                      id: item.product_id,
-                                      name: item.name,
-                                      base_unit: item.base_unit
-                                    });
-                                    setSelectedCartId(item.cartId);
-                                    setBatchDialogOpen(true);
-                                  }}
-                                >
-                                  <Package className="h-3 w-3 mr-1.5" />
-                                  <span className="truncate">
-                                    {item.selected_batches.length > 0
-                                      ? `${item.selected_batches[0].batch_number} (${formatDate(item.selected_batches[0].expiry_date, "DD/MM")})`
-                                      : "Chọn lô *"}
-                                  </span>
-                                </Button>
-                              </div>
-                            )}
-
-                            {/* Điều chỉnh số lượng */}
-                            <div className="flex items-center gap-2">
-                              <Label className="text-[10px] font-medium text-muted-foreground w-12">
-                                SL
-                              </Label>
-                              <div className="flex-1 flex items-center gap-2">
-                                <div className="flex items-center border rounded-md">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 rounded-none hover:bg-muted"
-                                    onClick={() => updateCartItem(item.cartId, { quantity: Math.max(1, item.quantity - 1) })}
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const val = parseInt(e.target.value);
-                                      if (!isNaN(val) && val >= 1) updateCartItem(item.cartId, { quantity: val });
-                                    }}
-                                    className="h-6 w-12 text-center rounded-none border-0 [appearance:textfield] text-xs px-0"
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 rounded-none hover:bg-muted"
-                                    onClick={() => updateCartItem(item.cartId, { quantity: item.quantity + 1 })}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </div>
-
-                                {/* Điều chỉnh đơn giá */}
-                                <div className="relative flex-1">
-                                  <Input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={item.sale_price.toLocaleString('vi-VN')}
-                                    onChange={(e) => {
-                                      const raw = e.target.value.replace(/[^\d]/g, '');
-                                      const val = parseInt(raw);
-                                      if (!isNaN(val) && val >= 0) updateCartItem(item.cartId, { sale_price: val });
-                                    }}
-                                    className="h-6 text-xs pl-5 pr-1 text-right"
-                                  />
-                                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground">₫</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
                     </Card>
                   );
                 })
