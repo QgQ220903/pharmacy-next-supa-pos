@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import SalesLoading from "./loading";
 import { getSalesAction, getSaleDetailAction } from "@/app/actions/sales";
 import {
   Table,
@@ -176,81 +177,78 @@ export default function SalesHistoryPage() {
     return item.products?.unit || item.unit || "cái";
   };
 
+  if (isLoading) return <SalesLoading />;
+
   return (
     <div className="space-y-6">
       {/* Header và Search */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quản lý hóa đơn</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight">Quản lý hóa đơn</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Theo dõi và quản lý các giao dịch bán hàng
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Tìm mã đơn, tên khách..."
-              className="pl-9"
+              className="pl-9 h-9 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="sm" className="h-9 w-9 p-0">
             <Download className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Tổng doanh thu
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">
-                {formatPrice(totalRevenue)}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Tổng doanh thu</p>
+                <p className="text-2xl font-bold tracking-tight text-primary">
+                  {formatPrice(totalRevenue)}
+                </p>
               </div>
-              <div className="p-2 rounded-full bg-primary/10">
-                <TrendingUp className="h-5 w-5 text-primary" />
+              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
+                <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Số đơn hàng
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{totalOrders}</div>
-              <div className="p-2 rounded-full bg-primary/10">
-                <Receipt className="h-5 w-5 text-primary" />
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Số đơn hàng</p>
+                <p className="text-2xl font-bold tracking-tight text-foreground">{totalOrders}</p>
+                <p className="text-xs text-muted-foreground/80">hóa đơn</p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/30">
+                <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Giá trị đơn trung bình
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">
-                {formatPrice(averageOrderValue)}
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">Giá trị đơn TB</p>
+                <p className="text-2xl font-bold tracking-tight text-foreground">
+                  {formatPrice(averageOrderValue)}
+                </p>
               </div>
-              <div className="p-2 rounded-full bg-primary/10">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="p-2.5 rounded-xl bg-amber-100 dark:bg-amber-900/30">
+                <DollarSign className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
           </CardContent>
@@ -258,7 +256,7 @@ export default function SalesHistoryPage() {
       </div>
 
       {/* Sales Table */}
-      <Card>
+      <Card className="border-border/50 shadow-sm">
         <CardHeader>
           <CardTitle>Danh sách hóa đơn</CardTitle>
           <CardDescription>
@@ -266,12 +264,7 @@ export default function SalesHistoryPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Đang tải dữ liệu...</p>
-            </div>
-          ) : filteredSales.length === 0 ? (
+          {filteredSales.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold">Không tìm thấy hóa đơn</h3>

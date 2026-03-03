@@ -220,7 +220,7 @@ export async function createSaleAction(data: {
         hint: saleError.hint,
         code: saleError.code
       });
-      
+
       // Thử insert chỉ với các field cơ bản
       console.log("Retrying with minimal fields...");
       const minimalData = {
@@ -257,7 +257,7 @@ export async function createSaleAction(data: {
     for (const item of data.items) {
       for (const batch of item.selected_batches) {
         console.log(`Checking batch ${batch.batch_number}: need ${batch.quantity_to_deduct}`);
-        
+
         const { data: currentBatch, error: fetchError } = await supabase
           .from("product_batches")
           .select("quantity")
@@ -285,7 +285,7 @@ export async function createSaleAction(data: {
     for (const item of data.items) {
       const quantityInBase = item.quantity * item.conversion_factor;
       const batchId = item.selected_batches[0]?.batch_id || null;
-      
+
       console.log(`Inserting sale item:`, {
         product_id: item.product_id,
         batch_id: batchId,
@@ -323,12 +323,12 @@ export async function createSaleAction(data: {
 
     revalidatePath("/pos");
     revalidatePath("/sales");
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       saleCode: sale.sale_code,
       saleId: sale.id,
-      message: "Thanh toán thành công!" 
+      message: "Thanh toán thành công!"
     };
   } catch (error: any) {
     console.error("=== CREATE SALE ERROR ===");
@@ -336,10 +336,10 @@ export async function createSaleAction(data: {
     console.error("Error message:", error.message);
     console.error("Error stack:", error.stack);
     console.error("========================");
-    
-    return { 
-      success: false, 
-      message: error.message || "Lỗi khi thanh toán" 
+
+    return {
+      success: false,
+      message: error.message || "Lỗi khi thanh toán"
     };
   }
 }
@@ -415,16 +415,20 @@ export async function getSaleDetailAction(saleId: string) {
     // Format lại dữ liệu
     const formattedItems = (sale.items || []).map((item: any) => ({
       id: item.id,
-      product_name: item.product?.name || "N/A",
-      base_unit: item.product?.base_unit || "",
+      product_id: item.product?.id || "",
+      // Field names must match getProductName() and getProductUnit() in sales/page.tsx
+      name: item.product?.name || "N/A",
+      unit: item.unit?.unit_name || item.product?.base_unit || "",
+      products: {
+        name: item.product?.name || "N/A",
+        unit: item.unit?.unit_name || item.product?.base_unit || "",
+      },
       quantity: item.quantity,
       quantity_in_base: item.quantity_in_base,
       unit_price: item.unit_price,
       total_price: item.total_price,
-      batch_number: item.batch?.batch_number,
-      expiry_date: item.batch?.expiry_date,
-      unit_name: item.unit?.unit_name,
-      conversion_factor: item.unit?.conversion_factor,
+      batch_number: item.batch?.batch_number || null,
+      expiry_date: item.batch?.expiry_date || null,
     }));
 
     return {

@@ -5,20 +5,16 @@ import { useReactToPrint } from "react-to-print";
 import {
   ShoppingCart, Trash2, Receipt, CreditCard,
   Banknote, CheckCircle2, Loader2, X,
-  Plus, Minus, Package, Search, User,
-  ChevronDown, ChevronUp, AlertCircle, History,
-  Printer, Tag, Calendar, Percent, Phone,
-  UserCircle, Store, Clock, ArrowRight
+  Plus, Minus, Package, Search,
+  Percent, Phone, UserCircle, ArrowRight
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { ProductSearchPOS } from "@/components/pos/ProductSearchPOS";
 import { BatchSelector } from "@/components/pos/BatchSelector";
@@ -26,6 +22,7 @@ import { PrintInvoice } from "@/components/pos/PrintInvoice";
 import { createSaleAction } from "@/app/actions/sales";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
 
 interface CartItem {
   id: string;
@@ -216,105 +213,24 @@ export default function POSForm({ initialProducts, totalCount }: Props) {
   return (
     <>
       {/* Container chính */}
-      <div className="h-[calc(100vh-180px)] flex flex-col bg-background rounded-xl border shadow-lg overflow-hidden">
+      <div className="h-[calc(100vh-130px)] flex flex-col bg-background rounded-xl border shadow-lg overflow-hidden">
 
-        {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-6 py-3 border-b bg-gradient-to-r from-primary/5 to-transparent">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Store className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Pharmacy POS</span>
-            </div>
-            <div className="h-4 w-px bg-border"></div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span>{new Date().toLocaleTimeString('vi-VN')}</span>
-              <span className="text-xs px-2 py-1 bg-muted rounded-full">
-                {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })}
-              </span>
-            </div>
+        {/* Top search bar */}
+        <div className="shrink-0 px-4 py-2 border-b bg-card/30 flex items-center gap-3">
+          <div className="flex-1 max-w-xl">
+            <ProductSearchPOS
+              onSelect={addToCart}
+              initialProducts={initialProducts}
+              onSearchChange={setSearchQuery}
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="px-3 py-1 gap-2">
-              <Package className="h-3.5 w-3.5" />
-              <span>{totalCount} sản phẩm</span>
-            </Badge>
-            <Badge variant="secondary" className="px-3 py-1">
-              <User className="h-3.5 w-3.5 mr-1" />
-              Nhân viên: Admin
-            </Badge>
-          </div>
+          <p className="text-xs text-muted-foreground whitespace-nowrap hidden sm:block">
+            Nhập tên, mã SP hoặc quét mã vạch
+          </p>
         </div>
 
-        {/* 3 columns */}
+        {/* 2 columns: Cart + Checkout */}
         <div className="flex flex-1 min-h-0 divide-x">
-
-          {/* Column 1: Product List */}
-          <div className="w-80 flex flex-col bg-card/30">
-            {/* Search */}
-            <div className="shrink-0 p-4 border-b">
-              <Label className="text-xs font-medium text-muted-foreground mb-2 block">
-                Tìm kiếm sản phẩm
-              </Label>
-              <ProductSearchPOS
-                onSelect={addToCart}
-                initialProducts={initialProducts}
-                onSearchChange={setSearchQuery}
-              />
-              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                <Search className="h-3 w-3" />
-                Nhập tên, mã SP hoặc quét mã vạch
-              </p>
-            </div>
-
-            {/* Popular products title */}
-            <div className="shrink-0 px-4 py-2 flex items-center justify-between border-b">
-              <div className="flex items-center gap-2">
-                <Tag className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Sản phẩm phổ biến</span>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {initialProducts.length}
-              </Badge>
-            </div>
-
-            {/* Product list - scrollable with native CSS */}
-            <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
-              {initialProducts.slice(0, 15).map((product) => (
-                <div
-                  key={product.id}
-                  className="group p-3 border rounded-lg hover:border-primary hover:shadow-md hover:bg-primary/5 cursor-pointer transition-all"
-                  onClick={() => addToCart(product)}
-                >
-                  <div className="flex items-start gap-2">
-                    <Avatar className="h-8 w-8 shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {product.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate group-hover:text-primary transition-colors">
-                        {product.name}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <span>{product.internal_code}</span>
-                        <span>•</span>
-                        <span>Tồn: {product.current_stock}</span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-bold text-primary">
-                        {formatPrice(product.sale_price)}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {product.base_unit}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Column 2: Cart */}
           <div className="flex-1 flex flex-col bg-background min-w-[500px]">
@@ -352,7 +268,7 @@ export default function POSForm({ initialProducts, totalCount }: Props) {
                     <ShoppingCart className="h-8 w-8 opacity-30" />
                   </div>
                   <p className="text-sm font-medium">Giỏ hàng đang trống</p>
-                  <p className="text-xs opacity-70 mt-0.5">Thêm sản phẩm từ danh sách bên trái</p>
+                  <p className="text-xs opacity-70 mt-0.5">Tìm kiếm sản phẩm ở thanh tìm kiếm phía trên</p>
                 </div>
               ) : (
                 cart.map((item) => {

@@ -18,11 +18,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Tổng quan</h1>
-        <p className="text-muted-foreground">
-          Dữ liệu thời gian thực - {new Date().toLocaleDateString("vi-VN")}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tổng quan</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Dữ liệu thời gian thực - {new Date().toLocaleDateString("vi-VN")}
+          </p>
+        </div>
       </div>
 
       <QuickActions />

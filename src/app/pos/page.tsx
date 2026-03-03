@@ -47,14 +47,6 @@ export default async function POSPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header với breadcrumb - giống trang sản phẩm */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <History className="h-4 w-4" />
-        <span>Bán hàng</span>
-        <span>/</span>
-        <span className="text-foreground font-medium">POS</span>
-      </div>
-
       {/* Header chính - giống trang nhập hàng */}
       <div className="flex items-center justify-between">
         <div>
