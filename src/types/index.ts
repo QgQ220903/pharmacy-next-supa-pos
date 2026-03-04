@@ -74,6 +74,7 @@ export interface InventoryTransaction {
   transaction_type: string;
   quantity_change: number;
   reference_id?: string | null;
+  notes?: string | null;
   created_at: string;
 }
 

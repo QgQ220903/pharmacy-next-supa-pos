@@ -52,7 +52,7 @@ const navItems = [
   },
   {
     name: "Kiểm kê",
-    href: "/inventory/history",
+    href: "/inventory",
     icon: Activity,
   },
   {

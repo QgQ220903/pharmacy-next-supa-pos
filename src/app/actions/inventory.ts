@@ -2,7 +2,14 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
-import { StockEntryFilters, ActionResponse, StockEntryDetail } from "@/types";
+import {
+  StockEntryFilters,
+  ActionResponse,
+  StockEntryDetail,
+  InventoryTransaction,
+  InventorySnapshot,
+  Product
+} from "@/types";
 
 // ==========================================
 // 1. LẤY DANH SÁCH PHIẾU NHẬP (CÓ FILTER SERVER)
@@ -10,12 +17,12 @@ import { StockEntryFilters, ActionResponse, StockEntryDetail } from "@/types";
 export async function getStockEntriesAction(params: StockEntryFilters = {}) {
   try {
     const supabase = await createClient();
-    const { 
-      page = 1, 
-      limit = 10, 
-      search = "", 
-      fromDate = "", 
-      toDate = "" 
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      fromDate = "",
+      toDate = ""
     } = params;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -144,7 +151,7 @@ async function generateEntryCode(): Promise<string> {
   const supabase = await createClient();
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-  
+
   // Lấy số thứ tự cao nhất trong ngày
   const { data, error } = await supabase
     .from("stock_entries")
@@ -161,7 +168,7 @@ async function generateEntryCode(): Promise<string> {
   const lastCode = data[0].entry_code;
   const lastNumber = parseInt(lastCode.split('-')[2] || '0000');
   const newNumber = lastNumber + 1;
-  
+
   return `IMP-${dateStr}-${newNumber.toString().padStart(4, '0')}`;
 }
 
@@ -208,15 +215,15 @@ export async function createStockEntryAction(formData: {
 
       if (product.manage_by_batch) {
         if (!item.batch_number?.trim()) {
-          return { 
-            success: false, 
-            message: `Sản phẩm "${product.name}" yêu cầu nhập số lô` 
+          return {
+            success: false,
+            message: `Sản phẩm "${product.name}" yêu cầu nhập số lô`
           };
         }
         if (!item.expiry_date) {
-          return { 
-            success: false, 
-            message: `Sản phẩm "${product.name}" yêu cầu nhập hạn dùng` 
+          return {
+            success: false,
+            message: `Sản phẩm "${product.name}" yêu cầu nhập hạn dùng`
           };
         }
       }
@@ -295,14 +302,14 @@ export async function createStockEntryAction(formData: {
     }
 
     revalidatePath("/entries");
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       data: entry,
       printData,
-      message: "Nhập hàng thành công!" 
+      message: "Nhập hàng thành công!"
     };
-    
+
   } catch (error: any) {
     console.error("createStockEntryAction error:", error);
     return { success: false, message: error.message || "Lỗi hệ thống" };
@@ -357,7 +364,7 @@ export async function deleteStockEntryAction(id: string) {
 export async function getProductsForEntry() {
   try {
     const supabase = await createClient();
-    
+
     const { data, error } = await supabase
       .from("products")
       .select(`
@@ -389,7 +396,7 @@ export async function getProductsForEntry() {
 export async function searchProductsForEntry(searchTerm: string) {
   try {
     const supabase = await createClient();
-    
+
     if (!searchTerm || searchTerm.length < 2) {
       return { success: true, data: [] };
     }
@@ -415,9 +422,9 @@ export async function searchProductsForEntry(searchTerm: string) {
 
     if (error) throw error;
 
-    return { 
-      success: true, 
-      data: data || [] 
+    return {
+      success: true,
+      data: data || []
     };
   } catch (error: any) {
     console.error("searchProductsForEntry error:", error);
@@ -431,7 +438,7 @@ export async function searchProductsForEntry(searchTerm: string) {
 export async function getPopularProducts(limit: number = 8) {
   try {
     const supabase = await createClient();
-    
+
     // Lấy sản phẩm có tồn kho (từ inventory_snapshot) và có giao dịch gần đây
     const { data, error } = await supabase
       .from("products")
@@ -454,12 +461,224 @@ export async function getPopularProducts(limit: number = 8) {
 
     if (error) throw error;
 
-    return { 
-      success: true, 
-      data: data || [] 
+    return {
+      success: true,
+      data: data || []
     };
   } catch (error: any) {
     console.error("getPopularProducts error:", error);
     return { success: false, data: [], message: error.message };
+  }
+}
+
+// ==========================================
+// 12. LẤY LỊCH SỬ BIẾN ĐỘNG KHO (TRUNG TÂM KIỂM KÊ)
+// ==========================================
+export async function getInventoryTransactionsAction(params: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  fromDate?: string;
+  toDate?: string;
+} = {}) {
+  try {
+    const supabase = await createClient();
+    const {
+      page = 1,
+      limit = 20,
+      search = "",
+      type = "all", // all, purchase, sale, adjustment
+      fromDate = "",
+      toDate = ""
+    } = params;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from("inventory_transactions")
+      .select(`
+        *,
+        product:products!inner(id, name, internal_code, base_unit)
+      `, { count: "exact" });
+
+    // Filter theo loại giao dịch
+    if (type !== "all") {
+      query = query.eq("transaction_type", type);
+    }
+
+    // Filter theo ngày
+    if (fromDate) query = query.gte("created_at", fromDate);
+    if (toDate) query = query.lte("created_at", `${toDate}T23:59:59`);
+
+    // Search theo tên sản phẩm hoặc mã (thực hiện qua join)
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,internal_code.ilike.%${search}%`, { foreignTable: "products" });
+    }
+
+    const { data, error, count } = await query
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: data || [],
+      totalCount: count || 0,
+      currentPage: page,
+      totalPages: Math.ceil((count || 0) / limit),
+    };
+  } catch (error: any) {
+    console.error("getInventoryTransactionsAction error:", error);
+    return { success: false, data: [], message: error.message };
+  }
+}
+
+// ==========================================
+// 13. LẤY TỒN KHO TỨC THỜI CỦA TẤT CẢ SẢN PHẨM (KÈM NHẬP/XUẤT)
+// ==========================================
+export async function getProductsWithStockAction(params: {
+  search?: string;
+  page?: number;
+  limit?: number;
+  lowStockOnly?: boolean;
+} = {}) {
+  try {
+    const supabase = await createClient();
+    const { search = "", page = 1, limit = 20, lowStockOnly = false } = params;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let query = supabase
+      .from("v_products_extended")
+      .select(`
+        *,
+        inventory_transactions(
+          quantity_change,
+          transaction_type
+        )
+      `, { count: "exact" });
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,internal_code.ilike.%${search}%`);
+    }
+
+    if (lowStockOnly) {
+      query = query.eq("is_low_stock", true);
+    }
+
+    const { data, error, count } = await query
+      .order("name", { ascending: true })
+      .range(from, to);
+
+    if (error) throw error;
+
+    // Tính toán total_in và total_out cho mỗi sản phẩm
+    const enrichedData = (data || []).map((p: any) => {
+      const transactions = p.inventory_transactions || [];
+      const total_in = transactions
+        .filter((t: any) => t.quantity_change > 0)
+        .reduce((sum: number, t: any) => sum + t.quantity_change, 0);
+
+      const total_out = transactions
+        .filter((t: any) => t.quantity_change < 0)
+        .reduce((sum: number, t: any) => sum + Math.abs(t.quantity_change), 0);
+
+      const { inventory_transactions, ...productData } = p;
+      return {
+        ...productData,
+        total_in,
+        total_out
+      };
+    });
+
+    return {
+      success: true,
+      data: enrichedData,
+      totalCount: count || 0,
+      currentPage: page,
+      totalPages: Math.ceil((count || 0) / limit),
+    };
+  } catch (error: any) {
+    console.error("getProductsWithStockAction error:", error);
+    return { success: false, data: [], message: error.message };
+  }
+}
+
+// ==========================================
+// 14. ĐIỀU CHỈNH KHO THỦ CÔNG (KIỂM KÊ)
+// ==========================================
+export async function adjustInventoryAction(data: {
+  productId: string;
+  quantityChange: number;
+  reason: string;
+  batchId?: string;
+  isAbsolute?: boolean;
+}) {
+  try {
+    const supabase = await createClient();
+
+    // 1. Cập nhật snapshot
+    const { data: snapshot } = await supabase
+      .from("inventory_snapshot")
+      .select("quantity")
+      .eq("product_id", data.productId)
+      .single();
+
+    const currentQty = snapshot?.quantity || 0;
+
+    // Tính toán lượng thay đổi thực tế
+    let delta = data.quantityChange;
+    if (data.isAbsolute) {
+      delta = data.quantityChange - currentQty;
+    }
+
+    if (delta === 0) {
+      return { success: true, message: "Không có thay đổi số lượng" };
+    }
+
+    const newQty = currentQty + delta;
+
+    await supabase
+      .from("inventory_snapshot")
+      .upsert({ product_id: data.productId, quantity: newQty, last_updated: new Date().toISOString() });
+
+    // 2. Nếu có batchId, cập nhật batch
+    if (data.batchId) {
+      const { data: batch } = await supabase
+        .from("product_batches")
+        .select("quantity")
+        .eq("id", data.batchId)
+        .single();
+
+      const newBatchQty = (batch?.quantity || 0) + delta;
+
+      await supabase
+        .from("product_batches")
+        .update({ quantity: newBatchQty, updated_at: new Date().toISOString() })
+        .eq("id", data.batchId);
+    }
+
+    // 3. Ghi nhật ký biến động
+    const { error: transError } = await supabase
+      .from("inventory_transactions")
+      .insert([{
+        product_id: data.productId,
+        transaction_type: 'adjustment',
+        quantity_change: delta,
+        reference_id: null,
+        created_at: new Date().toISOString()
+      }]);
+
+    if (transError) throw transError;
+
+    revalidatePath("/inventory");
+    revalidatePath("/products");
+
+    return { success: true, message: "Điều chỉnh kho thành công" };
+  } catch (error: any) {
+    console.error("adjustInventoryAction error:", error);
+    return { success: false, message: error.message };
   }
 }
