@@ -14,8 +14,6 @@ import {
   Moon,
   Sun,
   LogOut,
-  HelpCircle,
-  Pill,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -76,36 +74,27 @@ export default function Sidebar() {
 
   return (
     <TooltipProvider>
-      <div
+      <aside
         className={cn(
           "hidden md:flex flex-col border-r bg-background",
           "sticky top-0 h-screen transition-all duration-300",
           collapsed ? "w-[70px]" : "w-[240px]"
         )}
       >
-        {/* Logo */}
-        <div className="flex h-16 items-center px-4 border-b border-border">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Pill className="h-4 w-4 text-primary" />
-            </div>
-            {!collapsed && (
-              <>
-                <span className="font-bold text-foreground">MedPOS</span>
-                <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">
-                  v2.0
-                </span>
-              </>
-            )}
-          </Link>
+        {/* Header - chỉ giữ tên hệ thống */}
+        <div className="flex h-16 items-center px-4 border-b">
+          {!collapsed && (
+            <Link href="/" className="font-bold text-foreground">
+              MedPOS
+            </Link>
+          )}
 
-          {/* Toggle button */}
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "h-6 w-6 rounded-md hover:bg-accent",
-              collapsed ? "ml-auto" : "ml-auto"
+              "h-6 w-6",
+              collapsed ? "mx-auto" : "ml-auto"
             )}
             onClick={() => setCollapsed(!collapsed)}
           >
@@ -122,7 +111,9 @@ export default function Sidebar() {
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+              const isActive =
+                pathname === item.href ||
+                pathname?.startsWith(item.href + "/");
 
               if (collapsed) {
                 return (
@@ -131,7 +122,7 @@ export default function Sidebar() {
                       <Link
                         href={item.href}
                         className={cn(
-                          "flex items-center justify-center h-9 rounded-md mx-1",
+                          "flex items-center justify-center h-9 rounded-md",
                           isActive
                             ? "bg-primary/10 text-primary"
                             : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -152,21 +143,21 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 h-9 rounded-md px-3",
+                    "flex items-center gap-3 h-9 rounded-md px-3 text-sm",
                     isActive
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  <span className="text-sm">{item.name}</span>
+                  <span>{item.name}</span>
                 </Link>
               );
             })}
           </nav>
         </div>
 
-        <Separator className="bg-border" />
+        <Separator />
 
         {/* Bottom Actions */}
         <div className="p-3 space-y-1">
@@ -177,8 +168,10 @@ export default function Sidebar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 mx-auto rounded-md hover:bg-accent"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="h-9 w-9 mx-auto"
+                  onClick={() =>
+                    setTheme(theme === "dark" ? "light" : "dark")
+                  }
                 >
                   {theme === "dark" ? (
                     <Moon className="h-4 w-4" />
@@ -194,8 +187,10 @@ export default function Sidebar() {
           ) : (
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 h-9 px-3 text-sm hover:bg-accent"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="w-full justify-start gap-3 h-9 px-3 text-sm"
+              onClick={() =>
+                setTheme(theme === "dark" ? "light" : "dark")
+              }
             >
               {theme === "dark" ? (
                 <Moon className="h-4 w-4" />
@@ -206,32 +201,6 @@ export default function Sidebar() {
             </Button>
           )}
 
-          {/* Help Button */}
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 mx-auto rounded-md hover:bg-accent"
-                >
-                  <HelpCircle className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                Trợ giúp
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 h-9 px-3 text-sm hover:bg-accent"
-            >
-              <HelpCircle className="h-4 w-4" />
-              <span>Trợ giúp</span>
-            </Button>
-          )}
-
           {/* Logout Button */}
           {collapsed ? (
             <Tooltip>
@@ -239,7 +208,7 @@ export default function Sidebar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 mx-auto rounded-md hover:bg-destructive/10 hover:text-destructive"
+                  className="h-9 w-9 mx-auto text-muted-foreground hover:text-destructive"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
@@ -251,14 +220,14 @@ export default function Sidebar() {
           ) : (
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 h-9 px-3 text-sm hover:bg-destructive/10 hover:text-destructive"
+              className="w-full justify-start gap-3 h-9 px-3 text-sm text-muted-foreground hover:text-destructive"
             >
               <LogOut className="h-4 w-4" />
               <span>Đăng xuất</span>
             </Button>
           )}
         </div>
-      </div>
+      </aside>
     </TooltipProvider>
   );
 }

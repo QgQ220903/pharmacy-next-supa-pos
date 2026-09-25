@@ -1,5 +1,4 @@
 import {
-  Package,
   ShoppingCart,
   ArrowDownCircle,
   RefreshCcw,
@@ -12,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export function ActivityLog({ data }: { data: any[] }) {
   const getIcon = (type: string) => {
@@ -28,11 +28,11 @@ export function ActivityLog({ data }: { data: any[] }) {
   const getBadgeVariant = (type: string) => {
     switch (type) {
       case "sale":
-        return "destructive";
+        return "default"; // primary — bán hàng là hoạt động chính
       case "purchase":
-        return "default";
+        return "secondary"; // xám — nhập kho là hoạt động phụ
       default:
-        return "secondary";
+        return "outline"; // viền — điều chỉnh
     }
   };
 
@@ -49,57 +49,80 @@ export function ActivityLog({ data }: { data: any[] }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Hoạt động kho mới nhất</CardTitle>
-        <CardDescription>Nhật ký hoạt động gần đây</CardDescription>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold">
+          Hoạt động kho mới nhất
+        </CardTitle>
+        <CardDescription className="text-xs mt-1">
+          Nhật ký hoạt động gần đây
+        </CardDescription>
       </CardHeader>
+
       <CardContent>
-        <div className="space-y-4">
-          {data.map((item, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-3 pb-4 border-b last:border-0 last:pb-0"
-            >
-              <div className="mt-1 rounded-full bg-muted p-2">
-                {getIcon(item.transaction_type)}
-              </div>
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{item.products?.name}</p>
-                  <Badge variant={getBadgeVariant(item.transaction_type)}>
-                    {getBadgeText(item.transaction_type)}
-                  </Badge>
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border border-dashed rounded-lg">
+            <p className="text-sm">Chưa có hoạt động nào</p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {data.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
+              >
+                {/* Icon */}
+                <div className="h-9 w-9 shrink-0 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+                  {getIcon(item.transaction_type)}
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    {item.transaction_type === "sale"
-                      ? "Xuất bán hàng"
-                      : "Nhập hàng vào kho"}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-sm font-bold ${
-                        item.quantity_change > 0
-                          ? "text-emerald-600"
-                          : "text-red-600"
-                      }`}
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">
+                      {item.products?.name}
+                    </p>
+                    <Badge
+                      variant={getBadgeVariant(item.transaction_type)}
+                      className="h-5 px-1.5 text-[10px] font-normal shrink-0"
                     >
-                      {item.quantity_change > 0
-                        ? `+${item.quantity_change}`
-                        : item.quantity_change}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(item.created_at).toLocaleTimeString("vi-VN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
+                      {getBadgeText(item.transaction_type)}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.transaction_type === "sale"
+                        ? "Xuất bán hàng"
+                        : "Nhập hàng vào kho"}
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={cn(
+                          "text-sm font-semibold",
+                          item.quantity_change > 0
+                            ? "text-primary"
+                            : "text-destructive"
+                        )}
+                      >
+                        {item.quantity_change > 0
+                          ? `+${item.quantity_change}`
+                          : item.quantity_change}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(item.created_at).toLocaleTimeString(
+                          "vi-VN",
+                          {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }
+                        )}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

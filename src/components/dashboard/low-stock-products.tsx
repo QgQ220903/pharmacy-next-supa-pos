@@ -14,44 +14,43 @@ export default function LowStockProducts({ data }: { data: any[] }) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <CardTitle className="text-base font-semibold">
               Cảnh báo hết hàng
             </CardTitle>
-            <CardDescription>Sản phẩm sắp hết tồn kho</CardDescription>
+            <CardDescription className="text-xs mt-1">
+              Sản phẩm sắp hết tồn kho
+            </CardDescription>
           </div>
-          <Badge variant="outline" className="font-normal">
+          <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
             {data.length} sản phẩm
           </Badge>
         </div>
       </CardHeader>
+
       <CardContent>
-        <div className="space-y-3">
-          {data.length === 0 ? (
-            <div className="text-center py-6 space-y-2">
-              <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Tồn kho hiện tại đang ở mức an toàn
-              </p>
-            </div>
-          ) : (
-            data.map((item, i) => (
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border border-dashed rounded-lg">
+            <p className="text-sm">Tồn kho hiện tại đang ở mức an toàn</p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {data.map((item, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors"
               >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-md bg-amber-50 dark:bg-amber-950/30">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 shrink-0 rounded-md bg-primary/10 flex items-center justify-center">
+                    <AlertTriangle className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {item.name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
                       <Badge
                         variant="secondary"
-                        className="text-xs font-normal"
+                        className="h-4 px-1.5 text-[10px] font-normal"
                       >
                         {item.category}
                       </Badge>
@@ -61,16 +60,18 @@ export default function LowStockProducts({ data }: { data: any[] }) {
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                <div className="text-right shrink-0 ml-3">
+                  <p className="text-sm font-semibold">
                     {item.current_stock}
                   </p>
-                  <p className="text-xs text-muted-foreground">Tồn kho</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tồn kho
+                  </p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

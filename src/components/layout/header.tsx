@@ -1,13 +1,10 @@
 "use client";
 
 import {
-  User,
   Moon,
   Sun,
   LogOut,
-  Calendar,
   Clock,
-  Pill,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
@@ -16,7 +13,6 @@ import { vi } from "date-fns/locale";
 import { useState, useEffect } from "react";
 import { signOut } from "@/app/actions/login";
 import { createClient } from "@/utils/supabase/client";
-import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   // Không cần title và description nữa
@@ -68,29 +64,16 @@ export default function Header({}: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background px-4 lg:px-6">
-      {/* Left section: App Name & Slogan */}
+      {/* Left section: App Name */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-foreground tracking-tight">
-                MedPOS
-              </h1>
-              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                v2.0
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              Hệ thống quản lý nhà thuốc thông minh · An toàn · Hiệu quả
-            </p>
-          </div>
-        </div>
+        <h1 className="text-xl font-bold text-foreground tracking-tight">
+          MedPOS
+        </h1>
       </div>
 
       {/* DateTime */}
-      <div className="flex items-center gap-2 text-sm bg-muted/30 px-3 py-1.5 rounded-md">
-        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-        <Clock className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+      <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+        <Clock className="h-3.5 w-3.5" />
         <span className="font-mono tabular-nums text-foreground">
           {currentDateTime}
         </span>
@@ -101,7 +84,7 @@ export default function Header({}: HeaderProps) {
         variant="ghost"
         size="icon"
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        className="h-9 w-9 rounded-md hover:bg-accent"
+        className="h-9 w-9"
       >
         {theme === "dark" ? (
           <Moon className="h-4 w-4" />
@@ -111,7 +94,7 @@ export default function Header({}: HeaderProps) {
       </Button>
 
       {/* User Info */}
-      <div className="flex items-center gap-3 pl-2 border-l border-border">
+      <div className="flex items-center gap-3 pl-3 border-l">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
             <span className="text-sm font-medium text-primary">
@@ -127,13 +110,13 @@ export default function Header({}: HeaderProps) {
             </p>
           </div>
         </div>
-        
+
         <Button
           variant="ghost"
           size="icon"
           onClick={handleSignOut}
           disabled={isLoggingOut}
-          className="h-8 w-8 rounded-md hover:bg-destructive/10 hover:text-destructive"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
           title="Đăng xuất"
         >
           {isLoggingOut ? (
